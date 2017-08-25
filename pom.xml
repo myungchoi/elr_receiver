@@ -1,0 +1,65 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>edu.gatech.i3l.hl7.v2</groupId>
+  <artifactId>elr_receiver</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>elr_receiver</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <repositories>
+    <!-- Added to get the Atmosphere 1.1.0-SNAPSHOT, can be removed when 1.1.0 is released -->
+    <repository>
+      <id>oss.sonatype.org-snapshot</id>
+      <url>http://oss.sonatype.org/content/repositories/snapshots</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+  <dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- This is the core HAPI library -->
+	<dependency>
+	  <groupId>ca.uhn.hapi</groupId>
+	  <artifactId>hapi-base</artifactId>
+	  <version>2.3</version>
+	</dependency>
+	<!-- Structure JARs for HL7 v2.5.1 and v2.2-->
+	<dependency>
+  	  <groupId>ca.uhn.hapi</groupId>
+  	  <artifactId>hapi-structures-v251</artifactId>
+  	  <version>2.3</version>
+	</dependency>
+	<dependency>
+  	  <groupId>ca.uhn.hapi</groupId>
+  	  <artifactId>hapi-structures-v22</artifactId>
+  	  <version>2.3</version>
+	</dependency>
+	<!-- https://mvnrepository.com/artifact/com.sun.jersey/jersey-client -->
+	<dependency>
+	  <groupId>com.sun.jersey</groupId>
+	  <artifactId>jersey-client</artifactId>
+	  <version>1.19.4</version>
+	</dependency>
+	<dependency>
+	  <groupId>com.squareup.tape2</groupId>
+	  <artifactId>tape</artifactId>
+	  <version>2.0.0-SNAPSHOT</version>
+	</dependency>
+  </dependencies>
+</project>
