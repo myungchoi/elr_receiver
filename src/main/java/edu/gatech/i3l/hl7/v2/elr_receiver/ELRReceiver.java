@@ -41,6 +41,7 @@ public class ELRReceiver
 	static boolean default_useTls = false;
 	static String default_useTls_str = "False";
 	static String default_qFileName = "queueECR";
+	static String default_ecrTemplateFileName = "ECR.json";
 	
 	public static void main( String[] args ) throws Exception
 	{
@@ -51,6 +52,7 @@ public class ELRReceiver
 		boolean useTls = default_useTls;
 		String phcr_controller_api_url = default_phcr_controller_api_url;
 		String qFileName = default_qFileName;
+		String ecrTemplateFileName = default_ecrTemplateFileName;
 		
 		boolean writeConfig = false;
 		try {
@@ -60,7 +62,7 @@ public class ELRReceiver
 			port = Integer.parseInt(prop.getProperty("port", default_port));
 			phcr_controller_api_url = prop.getProperty("phcrControllerUrl", default_phcr_controller_api_url);
 			qFileName = prop.getProperty("qFileName", default_qFileName);
-			System.out.println(phcr_controller_api_url);
+			ecrTemplateFileName = prop.getProperty("ecrFileName", default_ecrTemplateFileName);
 			
 			if (prop.getProperty("useTls", default_useTls_str).equalsIgnoreCase("true")) {
 				useTls = true;
@@ -77,6 +79,7 @@ public class ELRReceiver
 				prop.setProperty("phcrControllerUrl", default_phcr_controller_api_url);
 				prop.setProperty("useTls", default_useTls_str);
 				prop.setProperty("qFileName", default_qFileName);
+				prop.setProperty("ecrFileName", default_ecrTemplateFileName);
 				prop.store(output, null);
 			}
 		}
@@ -90,7 +93,7 @@ public class ELRReceiver
 		server.setExceptionHandler(new MyExceptionHandler());
 
 		// Configure the Receiver App before we start.
-		handler.config(phcr_controller_api_url, useTls, qFileName);
+		handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName);
 
 		server.startAndWait();
 	}

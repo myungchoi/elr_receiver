@@ -1,0 +1,132 @@
+{
+	"Provider": {
+		"ID": 87456,
+
+		"Name": "Jon Duke",
+
+		"Phone": "(123)-456-7890",
+
+		"Fax": "(678)-123-4567",
+
+		"Email": "Jon.Duke@icl.gtri.gatech.edu",
+
+		"Facility": "GATECH Labs",
+		"Address": "North Ave NW, Atlanta GA",
+		"Country": "United States"
+	},
+	"Facility": {
+		"ID": 34223,
+		"Name": "Gatech Labs",
+		"Phone": "(770)-234-5768",
+		"Address": "North Ave NW, Atlanta GA 30340",
+		"Fax": "(678)-123-4567",
+		"Hospital Unit": "Sexual health"
+	},
+	
+	"Patient": {
+		"ID": "",
+		"Name": {
+			"given": "",
+			"family": ""
+		},
+
+		"Parents_Guardians": [
+		{
+			"Name": {
+				"given": "",
+				"family": ""
+			},
+			"Phone": "",
+			"Email": ""
+		},
+		{
+			"Name": {
+				"given": "",
+				"family": ""
+			},
+			"Phone": "",
+			"Email": ""
+		}
+		],
+		"Street Address": "",
+		"Birth Date": "",
+		"Sex": "",
+		"Class": "",
+		"Race": {
+			"System": "",
+			"Code": "",
+			"Display": ""
+		},
+		"Ethnicity": {
+			"System": "",
+			"Code": "",
+			"Display": ""
+		},
+		"Preferred Language": {
+			"System": "",
+			"Code": "",
+			"Display": ""
+		},
+		"Occupation": "",
+		"Pregnant": false
+	},
+
+
+	"Insurance Type": {
+		"Value":"DISEASEPRG",
+		"ValueSetOID":"2.16.840.1.113883.4.642.3.514"
+	},
+
+	"Immunization History": [
+		{
+			"Value":"83",
+			"ValueSetOID":"2.16.840.1.113883.3.88.12.80.22"
+		},
+		{
+			"Value":"08",
+			"ValueSetOID":"2.16.840.1.113883.3.88.12.80.22"
+		}
+	],
+
+	"Visit DateTime": "08-18-2018",
+
+	"Admission DateTime": "08-17-2018",
+
+	"Date of Onset": "06-01-2018",
+
+	"Symptoms": [ 
+		{
+			"Value":"2526004",
+			"ValueSetOID": "2.16.840.1.113883.4.642.3.256"
+		}
+	],
+
+	"Lab Order Code": {
+		"Value":"10351-5",
+		"ValueSet":"LOINC"
+	},
+
+	"Diagnosis": {
+		"Value":"192008",
+		"ValueSet":"SNOMED"
+	},
+
+	"Date Discharged": "008-26-2018",
+
+	"Laboratory Results": {
+		"Value":"63938009",
+		"ValueSet":"SNOMED CT"
+	},
+
+	"Trigger Code": {
+		"Value":"787.91",
+		"ValueSet":"ICD9"
+	},
+
+	"Lab Tests Performed": [
+		{
+			"Value":"3026200005",
+			"ResultStatus":false
+		}
+	]
+}
