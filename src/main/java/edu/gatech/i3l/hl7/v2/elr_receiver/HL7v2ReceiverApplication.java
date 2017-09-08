@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -21,6 +22,7 @@ import com.sun.jersey.api.client.WebResource;
 import ca.uhn.hl7v2.DefaultHapiContext;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
+import ca.uhn.hl7v2.model.Varies;
 import ca.uhn.hl7v2.model.primitive.IS;
 import ca.uhn.hl7v2.model.v251.datatype.CE;
 import ca.uhn.hl7v2.model.v251.datatype.CX;
@@ -29,10 +31,17 @@ import ca.uhn.hl7v2.model.v251.datatype.HD;
 import ca.uhn.hl7v2.model.v251.datatype.ST;
 import ca.uhn.hl7v2.model.v251.datatype.TS;
 import ca.uhn.hl7v2.model.v251.datatype.XAD;
+import ca.uhn.hl7v2.model.v251.datatype.XCN;
+import ca.uhn.hl7v2.model.v251.datatype.XON;
 import ca.uhn.hl7v2.model.v251.datatype.XPN;
+import ca.uhn.hl7v2.model.v251.datatype.XTN;
+import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
 import ca.uhn.hl7v2.model.v251.message.ORU_R01;
+import ca.uhn.hl7v2.model.v251.segment.OBR;
+import ca.uhn.hl7v2.model.v251.segment.OBX;
+import ca.uhn.hl7v2.model.v251.segment.ORC;
 import ca.uhn.hl7v2.model.v251.segment.PID;
 import ca.uhn.hl7v2.protocol.ReceivingApplication;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
@@ -53,12 +62,12 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	private QueueFile queueFile = null;
 	private TimerTask timerTask = null;
 	private Timer timer= null;
-	private JSONObject ecr_json = null;
+//	private JSONObject ecr_json = null;
 	
 	// Error Status
 	static int PID_ERROR = -1;
 	static enum ErrorCode {
-		NOERROR, PID;
+		NOERROR, PID, ORDER_OBSERVATION, LAB_RESULTS, INTERNAL;
 	}
 	
 	public static JSONObject parseJSONFile(String filename) throws JSONException, IOException {
@@ -77,11 +86,11 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			queueFile = new QueueFile.Builder(file).build();
 		}
 		
-		// Set up ECR template
-		if (ecr_json == null) {
-			ecr_json = parseJSONFile(ecr_template_filename);
-		}
-		
+//		// Set up ECR template
+//		if (ecr_json == null) {
+//			ecr_json = parseJSONFile(ecr_template_filename);
+//		}
+//		
 		// After QueueFile is set up, we start background service.
 		if (timerTask == null)
 			timerTask = new QueueTaskTimer(this);
@@ -137,7 +146,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		}
 		
 		try {
-			send_ecr(ecr_json);
+//			send_ecr(ecr_json);
 			return theMessage.generateACK();
 		} catch (IOException e) {
 			throw new HL7Exception(e);
@@ -145,11 +154,50 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			throw new ReceivingApplicationException(e);
 		}
 	}
+	
+	String make_single_address (XAD addressXAD) {
+		String ret = "";
+		
+		String address = addressXAD.getStreetAddress().getStreetOrMailingAddress().getValueOrEmpty();
+		String city = addressXAD.getCity().getValueOrEmpty();
+		String state = addressXAD.getStateOrProvince().getValueOrEmpty();
+		String zip = addressXAD.getZipOrPostalCode().getValueOrEmpty();
+		
+		if (!address.isEmpty()) ret = address;
+		if (!city.isEmpty()) {
+			if (ret.isEmpty()) ret = city;
+			else ret += ", "+city;
+		}
+		if (!state.isEmpty()) {
+			if (ret.isEmpty()) ret = state;
+			else ret += " "+state;
+		}
+		if (!zip.isEmpty()) {
+			if (ret.isEmpty()) ret = zip;
+			else ret += " "+zip;
+		}
+
+		return ret;
+	}
+	
+	private void put_CE_to_json (CE element, JSONObject json_obj) {
+		String System = element.getNameOfCodingSystem().getValueOrEmpty();
+		String Code = element.getIdentifier().getValueOrEmpty();
+		String Display = element.getText().getValueOrEmpty();
+		
+		if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
+			json_obj.put("System", element.getNameOfAlternateCodingSystem().getValueOrEmpty());
+			json_obj.put("Code", element.getAlternateIdentifier().getValueOrEmpty());
+			json_obj.put("Display", element.getAlternateText().getValueOrEmpty());
+		} else {
+			json_obj.put("System", System);
+			json_obj.put("Code", Code);
+			json_obj.put("Display", Display);					
+		}
+	}
 
 	/*
-	 * From Message, parse patient information and map to ECR 
-	 * 
-	 * We walk through Patient Results and selects the patient ID that has assigned auth
+	 * We selects the patient ID that has assigned auth
 	 * name as "EMR". If this does not exist, then we choose the last patient ID from the list.
 	 * 
 	 * Patient Name is selected from the same section. If multiple names exist, we choose
@@ -163,208 +211,414 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	 * Address: PID-11
 	 * Preferred Language: PID-15
 	 * Ethnicity: PID-22
-	 * returns 0 if successful without error.
+	 * 
 	 */
-	private int mapPatientInfo (ORU_R01 msg) {
-		String selectedPatientID = "";
+	private int map_patient (ORU_R01_PATIENT patient, JSONObject ecr_json) {
 		String patientID = "";
 		String patientName_last = "";
 		String patientName_given = "";
 		String patientName_middle = "";
-		String patientDOB = "";
-		String patientGender = "";
-		String patientRaceSystem = "";
-		String patientRaceCode = "";
-		String patientRaceDisplay = "";
-		String patientAddress = "";
-		String patientPreferredLanguageSystem = "";
-		String patientPreferredLanguageCode = "";
-		String patientPreferredLanguageDisplay = "";
-		String patientEthnicitySystem = "";
-		String patientEthnicityCode = "";
-		String patientEthnicityDisplay = "";
 				
-		int totalRepPatientResult = msg.getPATIENT_RESULTReps();
-		for (int i=0; i<totalRepPatientResult; i++) {
-			ORU_R01_PATIENT patient = msg.getPATIENT_RESULT(i).getPATIENT();
-			PID pid_seg = patient.getPID();
-			int totPID3 = pid_seg.getPid3_PatientIdentifierListReps();
-			for (int j=0; j<totPID3; j++) {
-				CX pIdentifier = pid_seg.getPid3_PatientIdentifierList(j);
-				
-				// From PID-3-1 (ID Number) is REQUIRED. So, get this one.
-				patientID = pIdentifier.getIDNumber().getValue();
-				
-				// Rest of Extended Composite ID are all optional. So, we get
-				// them if available.
-				HD pIdAssignAuth = pIdentifier.getAssigningAuthority();
-				String AssignAuthName = pIdAssignAuth.getNamespaceID().getValueOrEmpty();
+		String System, Code, Display;
+		
+		JSONObject patient_json = new JSONObject();
+		ecr_json.put("Patient", patient_json);
+//		JSONObject patient_json = ecr_json.getJSONObject("Patient");
 
-				// Patient ID Number and Assigning Authority Name Space (user defined)
-				// will probably sufficient to check.
-				if (AssignAuthName.isEmpty()) {
-					// We need to have this...
-					continue;
-				}
-				
+		// Patient information itself
+		PID pid_seg = patient.getPID();
+		int totPID3 = pid_seg.getPid3_PatientIdentifierListReps();
+		for (int j=0; j<totPID3; j++) {
+			CX pIdentifier = pid_seg.getPid3_PatientIdentifierList(j);
+			
+			// From PID-3-1 (ID Number) is REQUIRED. So, get this one.
+			patientID = pIdentifier.getIDNumber().getValue();
+			
+			// Rest of Extended Composite ID are all optional. So, we get
+			// them if available.
+			HD pIdAssignAuth = pIdentifier.getAssigningAuthority();
+			String AssignAuthName = pIdAssignAuth.getNamespaceID().getValueOrEmpty();
+
+			// Patient ID Number and Assigning Authority Name Space (user defined)
+			// will probably sufficient to check.
+			if (!AssignAuthName.isEmpty()) {
 				if (AssignAuthName.equalsIgnoreCase("EMR")) {
-					selectedPatientID = patientID;
 					break;
 				}
 			}
-			
-			int totPatientNames = pid_seg.getPid5_PatientNameReps();
-			for (int j=0; j<totPatientNames; j++) {
-				XPN patientName_xpn = pid_seg.getPid5_PatientName(j);
-				FN f_name = patientName_xpn.getFamilyName();
-				ST f_name_st = f_name.getFn1_Surname();
-				patientName_last = f_name_st.getValueOrEmpty();
-				ST m_name = patientName_xpn.getGivenName();
-				patientName_given = m_name.getValueOrEmpty();
-				
-				if (patientName_last.isEmpty() && patientName_given.isEmpty()) {
-					continue;
-				}
-				
-				ST f_name_initial = patientName_xpn.getSecondAndFurtherGivenNamesOrInitialsThereof();
-				patientName_middle = f_name_initial.getValueOrEmpty();
-			}
-			
-			// DOB parse.
-			TS dateTimeDOB = pid_seg.getDateTimeOfBirth();
-			try {
-				if (dateTimeDOB.isEmpty() == false) {
-					patientDOB = dateTimeDOB.getTime().getValue();
-				}
-			} catch (HL7Exception e) {
-				e.printStackTrace();
-			}
-			
-			// Administrative Sex
-			IS gender = pid_seg.getAdministrativeSex();
-			patientGender = gender.getValueOrEmpty();
-
-			// Race
-			int totRaces = pid_seg.getRaceReps();
-			for (int j=0; j<totRaces; j++) {
-				CE raceCodedElement = pid_seg.getRace(j);
-				patientRaceSystem = raceCodedElement.getNameOfCodingSystem().getValueOrEmpty();
-				patientRaceCode = raceCodedElement.getIdentifier().getValueOrEmpty();
-				patientRaceDisplay = raceCodedElement.getText().getValueOrEmpty();
-				if (patientRaceSystem.isEmpty() && patientRaceCode.isEmpty() && patientRaceDisplay.isEmpty()) {
-					// Before we move to the next race. Check if we have alternative system.
-					patientRaceSystem = raceCodedElement.getNameOfAlternateCodingSystem().getValueOrEmpty();
-					patientRaceCode = raceCodedElement.getAlternateIdentifier().getValueOrEmpty();
-					patientRaceDisplay = raceCodedElement.getAlternateText().getValueOrEmpty();
-					if (patientRaceSystem.isEmpty() && patientRaceCode.isEmpty() && patientRaceDisplay.isEmpty()) 
-						continue;
-				}
-				
-				// We should have at least one Race Coded Element. Break out and move on
-				break;
-			}
-			
-			// Address
-			int totAddresses = pid_seg.getPatientAddressReps();
-			for (int j=0; j<totAddresses; j++) {
-				XAD addressXAD = pid_seg.getPatientAddress(j);
-				patientAddress = addressXAD.getStreetAddress().getStreetOrMailingAddress().getValueOrEmpty();
-			}
-			
-			// Preferred Language
-			CE primaryLangCE = pid_seg.getPrimaryLanguage();
-			patientPreferredLanguageSystem = primaryLangCE.getNameOfCodingSystem().getValueOrEmpty();
-			patientPreferredLanguageCode = primaryLangCE.getIdentifier().getValueOrEmpty();
-			patientPreferredLanguageDisplay = primaryLangCE.getText().getValueOrEmpty();
-			
-			if (patientPreferredLanguageSystem.isEmpty() && patientPreferredLanguageCode.isEmpty() && patientPreferredLanguageDisplay.isEmpty()) {
-				patientPreferredLanguageSystem = primaryLangCE.getCe6_NameOfAlternateCodingSystem().getValueOrEmpty();
-				patientPreferredLanguageCode = primaryLangCE.getAlternateIdentifier().getValueOrEmpty();
-				patientPreferredLanguageDisplay = primaryLangCE.getAlternateText().getValueOrEmpty();
-			}
-			
-			// Ethnicity
-			int totEthnicity = pid_seg.getEthnicGroupReps();
-			for (int j=0; j<totEthnicity; j++) {
-				CE ethnicityCE = pid_seg.getEthnicGroup(j);
-				patientEthnicitySystem = ethnicityCE.getNameOfCodingSystem().getValueOrEmpty();
-				patientEthnicityCode = ethnicityCE.getIdentifier().getValueOrEmpty();
-				patientEthnicityDisplay = ethnicityCE.getText().getValueOrEmpty();
-				
-				if (patientEthnicitySystem.isEmpty() && patientEthnicityCode.isEmpty() && patientEthnicityDisplay.isEmpty()) {
-					patientEthnicitySystem = ethnicityCE.getNameOfAlternateCodingSystem().getValueOrEmpty();
-					patientEthnicityCode = ethnicityCE.getAlternateIdentifier().getValueOrEmpty();
-					patientEthnicityDisplay = ethnicityCE.getAlternateText().getValueOrEmpty();
-				}
-			}
-			
-			// We are done for parsing. If we have required fields, then break out.
-			// Otherwise, loop to another Patient Result.
-			if (selectedPatientID.isEmpty() == false 
-					&& (patientName_given.isEmpty() == false || patientName_last.isEmpty() == false))
-				break;
 		}
 		
-		if (patientID.isEmpty() || (patientName_given.equalsIgnoreCase("") && patientName_last.equalsIgnoreCase(""))) {
-			// We have no patient ID or no patient name information. Return with null.
-			return -1;
+		int totPatientNames = pid_seg.getPid5_PatientNameReps();
+		for (int j=0; j<totPatientNames; j++) {
+			XPN patientName_xpn = pid_seg.getPid5_PatientName(j);
+			FN f_name = patientName_xpn.getFamilyName();
+			ST f_name_st = f_name.getFn1_Surname();
+			patientName_last = f_name_st.getValueOrEmpty();
+			ST m_name = patientName_xpn.getGivenName();
+			patientName_given = m_name.getValueOrEmpty();
+			
+			if (patientName_last.isEmpty() && patientName_given.isEmpty()) {
+				continue;
+			}
+			
+			ST f_name_initial = patientName_xpn.getSecondAndFurtherGivenNamesOrInitialsThereof();
+			patientName_middle = f_name_initial.getValueOrEmpty();
 		}
-
-		if (selectedPatientID.isEmpty()) {
-			selectedPatientID = patientID;
-		}
+					
+		// We need patient id or name for rest to be useful. 
+		// If not, we move to the next patient result.
+		if (patientID == "" 
+				&& (patientName_given.isEmpty() && patientName_last.isEmpty()))
+			return 0;
 		
 		// Set all the collected patient information to ECR
-		JSONObject patient_json = ecr_json.getJSONObject("Patient");
-		JSONObject patient_name = patient_json.getJSONObject("Name");
+		JSONObject patient_name = new JSONObject();
+		patient_json.put("Name", patient_name);
 		
-		patient_json.put("ID", selectedPatientID);
+		patient_json.put("ID", patientID);
 		patient_name.put("given", patientName_given);
 		patient_name.put("family", patientName_last);
 		
-		// Patient DOD
-		patient_json.put("Birth Date", patientDOB);
+		// DOB parse.
+		TS dateTimeDOB = pid_seg.getDateTimeOfBirth();
+		try {
+			if (dateTimeDOB.isEmpty() == false) {
+				patient_json.put("Birth Date", dateTimeDOB.getTime().getValue());
+			}
+		} catch (HL7Exception e) {
+			e.printStackTrace();
+		}
 		
-		// Administrative Gender
-		patient_json.put("Sex", patientGender);
+		// Administrative Sex
+		IS gender = pid_seg.getAdministrativeSex();
+		patient_json.put("Sex", gender.getValueOrEmpty());
+
+		// Race
+		JSONObject patient_race = new JSONObject();
+		patient_json.put("Race", patient_race);
 		
-		// Adding Race Elements....
-		JSONObject patient_race = patient_json.getJSONObject("Race");
-		patient_race.put("System", patientRaceSystem);
-		patient_race.put("Code", patientRaceCode);
-		patient_race.put("Display", patientRaceDisplay);
+		String System2Use = "";
+		String Code2Use = "";
+		String Display2Use = "";
+		int totRaces = pid_seg.getRaceReps();
+		for (int j=0; j<totRaces; j++) {
+			CE raceCodedElement = pid_seg.getRace(j);
+			System = raceCodedElement.getNameOfCodingSystem().getValueOrEmpty();
+			Code = raceCodedElement.getIdentifier().getValueOrEmpty();
+			Display = raceCodedElement.getText().getValueOrEmpty();
+			
+			if (j==0) {
+				// First time. Save the parameters
+				System2Use = System;
+				Code2Use = Code;
+				Display2Use = Display;
+			}
+			
+			if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
+				// Before we move to the next race. Check if we have alternative system.
+				System = raceCodedElement.getNameOfAlternateCodingSystem().getValueOrEmpty();
+				Code = raceCodedElement.getAlternateIdentifier().getValueOrEmpty();
+				Display = raceCodedElement.getAlternateText().getValueOrEmpty();
+				if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) 
+					continue;
+			}
+			
+			if (!System.isEmpty() && !Code.isEmpty() && !Display.isEmpty()) {
+				// Done. All three parameters are available.
+				System2Use = System;
+				Code2Use = Code;
+				Display2Use = Display;
+				break;
+			}
+
+			if (!System.isEmpty() && !Code.isEmpty()) {
+				System2Use = System;
+				Code2Use = Code;
+				Display2Use = Display;					
+			} else if ((System2Use.isEmpty() || Code2Use.isEmpty()) && !Display.isEmpty()) {
+				System2Use = System;
+				Code2Use = Code;
+				Display2Use = Display;
+			}
+		}
+		patient_race.put("System", System2Use);
+		patient_race.put("Code", Code2Use);
+		patient_race.put("Display", Display2Use);
+
+		// Address
+		int totAddresses = pid_seg.getPatientAddressReps();
+		int weight = 0;
+		for (int j=0; j<totAddresses; j++) {
+			XAD addressXAD = pid_seg.getPatientAddress(j);
+			String address = make_single_address (pid_seg.getPatientAddress(j));
+			if (address == "") continue;
+			patient_json.put("Street Address", address);
+			break;
+		}
 		
-		// Add Address
-		patient_json.put("Street Address", patientAddress);
+		// Preferred Language
+		JSONObject patient_preferred_lang = new JSONObject();
+		patient_json.put("Preferred Language", patient_preferred_lang);
 		
-		// Add Preferred Language
-		JSONObject patient_preferred_lang = patient_json.getJSONObject("Preferred Language");
-		patient_preferred_lang.put("System", patientPreferredLanguageSystem);
-		patient_preferred_lang.put("Code", patientPreferredLanguageCode);
-		patient_preferred_lang.put("Display", patientPreferredLanguageDisplay);
+		CE primaryLangCE = pid_seg.getPrimaryLanguage();
+		put_CE_to_json(primaryLangCE, patient_preferred_lang);
+//		System = primaryLangCE.getNameOfCodingSystem().getValueOrEmpty();
+//		Code = primaryLangCE.getIdentifier().getValueOrEmpty();
+//		Display = primaryLangCE.getText().getValueOrEmpty();
+//		if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
+//			patient_preferred_lang.put("System", primaryLangCE.getCe6_NameOfAlternateCodingSystem().getValueOrEmpty());
+//			patient_preferred_lang.put("Code", primaryLangCE.getAlternateIdentifier().getValueOrEmpty());
+//			patient_preferred_lang.put("Display", primaryLangCE.getAlternateText().getValueOrEmpty());
+//		} else {
+//			patient_preferred_lang.put("System", System);
+//			patient_preferred_lang.put("Code", Code);
+//			patient_preferred_lang.put("Display", Display);
+//		}
 		
-		// Add Ethnicity
-		JSONObject patient_ethnicity = patient_json.getJSONObject("Ethnicity");
-		patient_ethnicity.put("System", patientEthnicitySystem);
-		patient_ethnicity.put("Code", patientEthnicityCode);
-		patient_ethnicity.put("Display", patientEthnicityDisplay);
+		// Ethnicity
+		JSONObject patient_ethnicity = new JSONObject();
+		patient_json.put("Ethnicity", patient_ethnicity);
 		
-		return 0;
+		int totEthnicity = pid_seg.getEthnicGroupReps();
+		for (int j=0; j<totEthnicity; j++) {
+			CE ethnicityCE = pid_seg.getEthnicGroup(j);
+			put_CE_to_json(ethnicityCE, patient_ethnicity);
+//			System = ethnicityCE.getNameOfCodingSystem().getValueOrEmpty();
+//			Code = ethnicityCE.getIdentifier().getValueOrEmpty();
+//			Display = ethnicityCE.getText().getValueOrEmpty();
+//			
+//			if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
+//				patient_ethnicity.put("System", ethnicityCE.getNameOfAlternateCodingSystem().getValueOrEmpty());
+//				patient_ethnicity.put("Code", ethnicityCE.getAlternateIdentifier().getValueOrEmpty());
+//				patient_ethnicity.put("Display", ethnicityCE.getAlternateText().getValueOrEmpty());
+//			} else {
+//				patient_ethnicity.put("System", System);
+//				patient_ethnicity.put("Code", Code);
+//				patient_ethnicity.put("Display", Display);					
+//			}
+		}
+		
+		return 1;
+	}
+
+	/*
+	 * 		 * ORDER OBSERVATION List
+	 *   OBR-16. Use ORC-12 if OBR-16 is empty.
+	 */
+	private int map_order_observation (ORU_R01_ORDER_OBSERVATION orderObs, JSONObject ecr_json) {
+		int ret = 0;
+		
+		// Provider
+		JSONObject provider_json = new JSONObject();
+		ecr_json.put("Provider", provider_json);
+		
+		OBR orderRequest = orderObs.getOBR();
+		int totalObr16 = orderRequest.getOrderingProviderReps();
+		for (int i=0; i<totalObr16; i++) {
+			XCN orderingProviderXCN = orderRequest.getOrderingProvider(i);
+			
+			String orderingProviderID = orderingProviderXCN.getIDNumber().getValueOrEmpty();
+			if (!orderingProviderID.isEmpty()) {
+				provider_json.put("ID", orderingProviderID);
+				ret = 1;
+			}
+		
+			String providerFamily = orderingProviderXCN.getFamilyName().getFn1_Surname().getValueOrEmpty();
+			String providerGiven = orderingProviderXCN.getGivenName().getValueOrEmpty();
+			String providerInitial = orderingProviderXCN.getSecondAndFurtherGivenNamesOrInitialsThereof().getValueOrEmpty();
+			String providerSuffix = orderingProviderXCN.getSuffixEgJRorIII().getValueOrEmpty();
+			String providerPrefix = orderingProviderXCN.getPrefixEgDR().getValueOrEmpty();
+			
+			String orderingProviderName = "";
+			if (!providerPrefix.isEmpty()) orderingProviderName = providerPrefix+" ";
+			if (!providerGiven.isEmpty()) orderingProviderName += providerGiven+" ";
+			if (!providerInitial.isEmpty()) orderingProviderName += providerInitial+" ";
+			if (!providerFamily.isEmpty()) orderingProviderName += providerFamily+" ";
+			if (!providerSuffix.isEmpty()) orderingProviderName += providerSuffix+" ";
+			
+			orderingProviderName = orderingProviderName.trim();
+			if (!orderingProviderName.isEmpty()) {
+				provider_json.put("Name", orderingProviderName);
+				ret = 1;
+			}
+			
+			if (!orderingProviderID.isEmpty() && !orderingProviderName.isEmpty()) {
+				break;
+			}
+		}
+		
+		// Observation Time
+		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
+		ecr_json.put("Visit DateTime", observationTime);
+		
+		// Reason for Study		
+		JSONArray reasons_json = new JSONArray();
+		ecr_json.put("Trigger Code", reasons_json);
+		
+		int totalReasons = orderRequest.getReasonForStudyReps();
+		for (int i=0; i<totalReasons; i++) {
+			CE reasonCE = orderRequest.getReasonForStudy(i);
+			JSONObject reason_json = new JSONObject();
+			put_CE_to_json (reasonCE, reason_json);
+			reasons_json.put(reason_json);
+		}
+		
+		// Below is ORC ---
+		// Facility
+		JSONObject facility_json = new JSONObject();
+		ecr_json.put("Facility", facility_json);
+		
+		ORC common_order = orderObs.getORC();
+		
+		// Facility Name
+		int totalFacilityNames = common_order.getOrderingFacilityNameReps();
+		for (int i=0; i<totalFacilityNames; i++) {
+			XON orderFacilityXON = common_order.getOrderingFacilityName(i);
+			String orgName = orderFacilityXON.getOrganizationName().getValueOrEmpty();
+			if (!orgName.isEmpty()) {
+				facility_json.put("Name", orgName);
+				String orgID = orderFacilityXON.getIDNumber().getValue();
+				if (orgID != null) {
+					ret ++;
+					facility_json.put("ID", orgID);
+					break;
+				}
+			}
+		}
+		
+		// Facility Phone Number
+		int totalFacilityPhones = common_order.getOrderingFacilityPhoneNumberReps();
+		for (int i=0; i<totalFacilityPhones; i++) {
+			XTN orderFacilityPhoneXTN = common_order.getOrderingFacilityPhoneNumber(i);
+			String country = orderFacilityPhoneXTN.getCountryCode().getValue();
+			String area = orderFacilityPhoneXTN.getAreaCityCode().getValue();
+			String local = orderFacilityPhoneXTN.getLocalNumber().getValue();
+			
+			String phone = "";
+			if (!country.isEmpty()) phone = country;
+			if (!area.isEmpty()) phone += "-"+area;
+			if (!local.isEmpty()) phone += "-"+local;
+			facility_json.put("Phone", phone);
+			if (!country.isEmpty() && !area.isEmpty() && !local.isEmpty()) {
+				ret++;
+				break;
+			} else {
+				String backward_phone = common_order.getOrderingFacilityPhoneNumber(i).getTelephoneNumber().getValueOrEmpty();
+				if (!backward_phone.isEmpty()) {
+					facility_json.put("Phone", backward_phone);
+					ret++;
+					break;
+				}
+			}
+		}
+		
+		// Facility Address
+		int totalFacilityAddress = common_order.getOrderingProviderAddressReps();
+		for (int i=0; i<totalFacilityAddress; i++) {
+			XAD addressXAD = common_order.getOrderingProviderAddress(i);
+			String address = make_single_address (addressXAD);
+			if (address=="") continue;
+			facility_json.put("Address", address);
+			ret++;
+			break;
+		}
+		
+		return ret;
 	}
 	
+	private int map_lab_results(ORU_R01_ORDER_OBSERVATION orderObs, JSONObject ecr_json) {
+		int ret = 0;
+		
+		// Below is OBSERVATION Section, which contains OBX. Laboratory Results
+		JSONArray labResults_json;
+		if (ecr_json.isNull("Laboratory Results")) {
+			labResults_json = new JSONArray();
+			ecr_json.put("Laboratory Results", labResults_json);
+		} else {
+			labResults_json = ecr_json.getJSONArray("Laboratory Results");
+		}
+			
+		int totalObservations = orderObs.getOBSERVATIONReps();
+		for (int i=0; i<totalObservations; i++) {
+			JSONObject labResult_json = new JSONObject();
+			// get OBX
+			OBX obsResultOBX = orderObs.getOBSERVATION(i).getOBX();
+			CE obsCE = obsResultOBX.getObservationIdentifier();
+			put_CE_to_json(obsCE, labResult_json);
+			
+			// Add Value and Unit if appropriate.
+			String valueType = obsResultOBX.getValueType().getValueOrEmpty();
+			if (!valueType.isEmpty()) {
+				if (valueType.equalsIgnoreCase("NM") 
+						|| valueType.equalsIgnoreCase("ST")
+						|| valueType.equalsIgnoreCase("TX")) {
+					int totalValues = obsResultOBX.getObservationValueReps();
+					if (totalValues > 0) {
+						Varies obsValue = obsResultOBX.getObservationValue(0);
+						labResult_json.put("Value", obsValue.toString());
+						CE unitCE = obsResultOBX.getUnits();
+						if (unitCE != null) {
+							JSONObject unit_json = new JSONObject();
+							put_CE_to_json(unitCE, unit_json);
+							labResult_json.put("Unit", unit_json);
+						}
+					}
+				}
+			}
+			
+			labResults_json.put(labResult_json);
+			ret++;
+		}
+		
+		return ret;
+	}
+		
 	private ErrorCode map2ecr(ORU_R01 msg) {
 		// Mapping ELR message to ECR.
 		//
 		// Investigate Patient Result Group
 		// see http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&triggerEvent=ORU_R01
 		//
-		if (mapPatientInfo(msg) < 0) {
-			// We have no complete patient information.
-			// Log this.
-			return ErrorCode.PID;
-		}
-		
-		
+		JSONObject ecr_json = new JSONObject();
+		int newECRs = 0;
+		int totalRepPatientResult = msg.getPATIENT_RESULTReps();
+		for (int i=0; i<totalRepPatientResult; i++) {
+			// Patient specific information
+			ORU_R01_PATIENT patient = msg.getPATIENT_RESULT(i).getPATIENT();
+			int result = map_patient (patient, ecr_json);
+			if (result >= 0)
+				newECRs = newECRs+result;
+			else if (result < 0) {
+				return ErrorCode.PID;
+			}
+			
+			// Provider
+			int totalOrderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATIONReps();
+			for (int j=0; j<totalOrderObs; j++) {
+				ORU_R01_ORDER_OBSERVATION orderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATION(j);
+				result = map_order_observation (orderObs, ecr_json);
+				if (result > 0) break;
+				else if (result < 0) {
+					return ErrorCode.ORDER_OBSERVATION;
+				}
+			}
+			
+			// LabResults
+			for (int j=0; j<totalOrderObs; j++) {
+				ORU_R01_ORDER_OBSERVATION orderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATION(j);
+				result = map_lab_results (orderObs, ecr_json);
+				if (result < 0) {
+					return ErrorCode.LAB_RESULTS;
+				}
+			}
+			
+			try {
+				send_ecr (ecr_json);
+			} catch (Exception e) {
+				e.printStackTrace();
+				return ErrorCode.INTERNAL;
+			}
+		}		
 		
 		return ErrorCode.NOERROR;
 	}
