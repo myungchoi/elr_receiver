@@ -39,6 +39,7 @@ import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
 import ca.uhn.hl7v2.model.v251.message.ORU_R01;
+import ca.uhn.hl7v2.model.v251.segment.MSH;
 import ca.uhn.hl7v2.model.v251.segment.OBR;
 import ca.uhn.hl7v2.model.v251.segment.OBX;
 import ca.uhn.hl7v2.model.v251.segment.ORC;
@@ -67,7 +68,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	// Error Status
 	static int PID_ERROR = -1;
 	static enum ErrorCode {
-		NOERROR, PID, ORDER_OBSERVATION, LAB_RESULTS, INTERNAL;
+		NOERROR, MSH, PID, ORDER_OBSERVATION, LAB_RESULTS, INTERNAL;
 	}
 	
 	public static JSONObject parseJSONFile(String filename) throws JSONException, IOException {
@@ -221,8 +222,14 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 				
 		String System, Code, Display;
 		
-		JSONObject patient_json = new JSONObject();
-		ecr_json.put("Patient", patient_json);
+		JSONObject patient_json;
+		if (ecr_json.isNull("Patient")) {
+			patient_json = new JSONObject();
+			ecr_json.put("Patient", patient_json);
+		} else
+			patient_json = ecr_json.getJSONObject("Patient");
+		
+		
 //		JSONObject patient_json = ecr_json.getJSONObject("Patient");
 
 		// Patient information itself
@@ -362,18 +369,6 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		
 		CE primaryLangCE = pid_seg.getPrimaryLanguage();
 		put_CE_to_json(primaryLangCE, patient_preferred_lang);
-//		System = primaryLangCE.getNameOfCodingSystem().getValueOrEmpty();
-//		Code = primaryLangCE.getIdentifier().getValueOrEmpty();
-//		Display = primaryLangCE.getText().getValueOrEmpty();
-//		if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
-//			patient_preferred_lang.put("System", primaryLangCE.getCe6_NameOfAlternateCodingSystem().getValueOrEmpty());
-//			patient_preferred_lang.put("Code", primaryLangCE.getAlternateIdentifier().getValueOrEmpty());
-//			patient_preferred_lang.put("Display", primaryLangCE.getAlternateText().getValueOrEmpty());
-//		} else {
-//			patient_preferred_lang.put("System", System);
-//			patient_preferred_lang.put("Code", Code);
-//			patient_preferred_lang.put("Display", Display);
-//		}
 		
 		// Ethnicity
 		JSONObject patient_ethnicity = new JSONObject();
@@ -383,19 +378,6 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		for (int j=0; j<totEthnicity; j++) {
 			CE ethnicityCE = pid_seg.getEthnicGroup(j);
 			put_CE_to_json(ethnicityCE, patient_ethnicity);
-//			System = ethnicityCE.getNameOfCodingSystem().getValueOrEmpty();
-//			Code = ethnicityCE.getIdentifier().getValueOrEmpty();
-//			Display = ethnicityCE.getText().getValueOrEmpty();
-//			
-//			if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
-//				patient_ethnicity.put("System", ethnicityCE.getNameOfAlternateCodingSystem().getValueOrEmpty());
-//				patient_ethnicity.put("Code", ethnicityCE.getAlternateIdentifier().getValueOrEmpty());
-//				patient_ethnicity.put("Display", ethnicityCE.getAlternateText().getValueOrEmpty());
-//			} else {
-//				patient_ethnicity.put("System", System);
-//				patient_ethnicity.put("Code", Code);
-//				patient_ethnicity.put("Display", Display);					
-//			}
 		}
 		
 		return 1;
@@ -407,7 +389,15 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	 */
 	private int map_order_observation (ORU_R01_ORDER_OBSERVATION orderObs, JSONObject ecr_json) {
 		int ret = 0;
-		
+		// Get patient json object.
+		JSONObject patient_json;
+		if (ecr_json.isNull("Patient")) {
+			patient_json = new JSONObject();
+			ecr_json.put("Patient", patient_json);
+		} else {
+			patient_json = ecr_json.getJSONObject("Patient");
+		}
+	
 		// Provider
 		JSONObject provider_json = new JSONObject();
 		ecr_json.put("Provider", provider_json);
@@ -449,11 +439,11 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		
 		// Observation Time
 		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
-		ecr_json.put("Visit DateTime", observationTime);
+		patient_json.put("Visit DateTime", observationTime);
 		
 		// Reason for Study		
 		JSONArray reasons_json = new JSONArray();
-		ecr_json.put("Trigger Code", reasons_json);
+		patient_json.put("Trigger Code", reasons_json);
 		
 		int totalReasons = orderRequest.getReasonForStudyReps();
 		for (int i=0; i<totalReasons; i++) {
@@ -528,14 +518,22 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	
 	private int map_lab_results(ORU_R01_ORDER_OBSERVATION orderObs, JSONObject ecr_json) {
 		int ret = 0;
+
+		JSONObject patient_json;
+		if (ecr_json.isNull("Patient")) {
+			patient_json = new JSONObject();
+			ecr_json.put("Patient", patient_json);
+		} else {
+			patient_json = ecr_json.getJSONObject("Patient");
+		}
 		
 		// Below is OBSERVATION Section, which contains OBX. Laboratory Results
 		JSONArray labResults_json;
-		if (ecr_json.isNull("Laboratory Results")) {
+		if (patient_json.isNull("Laboratory Results")) {
 			labResults_json = new JSONArray();
-			ecr_json.put("Laboratory Results", labResults_json);
+			patient_json.put("Laboratory Results", labResults_json);
 		} else {
-			labResults_json = ecr_json.getJSONArray("Laboratory Results");
+			labResults_json = patient_json.getJSONArray("Laboratory Results");
 		}
 			
 		int totalObservations = orderObs.getOBSERVATIONReps();
@@ -566,6 +564,12 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 				}
 			}
 			
+			// Put date.
+			TS obxDate = obsResultOBX.getDateTimeOfTheObservation();
+			if (obxDate != null) {
+				labResult_json.put("Date", obxDate.getTime().getValue());
+			}
+			
 			labResults_json.put(labResult_json);
 			ret++;
 		}
@@ -573,6 +577,34 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		return ret;
 	}
 		
+	private int set_sending_application(ORU_R01 msg, JSONObject ecr_json) {
+		String namespaceID = "";
+		String universalID = "";
+		String universalIDType = "";
+		
+		MSH msh = msg.getMSH();
+		HD sendingAppHD = msh.getSendingApplication();
+		if (sendingAppHD != null) {
+			namespaceID = sendingAppHD.getNamespaceID().getValueOrEmpty();
+			universalID = sendingAppHD.getUniversalID().getValueOrEmpty();
+			universalIDType = sendingAppHD.getUniversalIDType().getValueOrEmpty();
+		}
+		
+		String sendingApp = "";
+		if (!namespaceID.isEmpty())
+			sendingApp = namespaceID+" ";
+		if (!universalID.isEmpty())
+			sendingApp += universalID+" ";
+		if (!universalIDType.isEmpty())
+			sendingApp += universalIDType;
+		
+		sendingApp = sendingApp.trim();
+		
+		ecr_json.put("Sending Application", sendingApp);
+		
+		return 0;
+	}
+	
 	private ErrorCode map2ecr(ORU_R01 msg) {
 		// Mapping ELR message to ECR.
 		//
@@ -580,6 +612,13 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		// see http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&triggerEvent=ORU_R01
 		//
 		JSONObject ecr_json = new JSONObject();
+		
+		// Set sending application.
+		int res = set_sending_application(msg, ecr_json);
+		if (res < 0) {
+			return ErrorCode.MSH;
+			
+		}
 		int newECRs = 0;
 		int totalRepPatientResult = msg.getPATIENT_RESULTReps();
 		for (int i=0; i<totalRepPatientResult; i++) {
