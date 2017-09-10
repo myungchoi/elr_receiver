@@ -702,12 +702,11 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		WebResource webResource = client.resource(phcr_controller_api_url);
 		
 		System.out.println(ecrJson.toString());
-//		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecr_json);
-//		if (response.getStatus() != 201) {
-//			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
-//		} else {
-//			// Failed to write ECR. We should put this in the queue and retry.
-//			queueFile.add(ecrJson.toString().getBytes());
-//		}		
+		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson);
+		if (response.getStatus() != 201) {
+			// Failed to write ECR. We should put this in the queue and retry.
+			queueFile.add(ecrJson.toString().getBytes());
+			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
+		} 
 	}
 }
