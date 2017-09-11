@@ -1,15 +1,15 @@
 package edu.gatech.i3l.hl7.v2.elr_receiver;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -19,7 +19,6 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
-import ca.uhn.hl7v2.DefaultHapiContext;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
 import ca.uhn.hl7v2.model.Varies;
@@ -37,7 +36,6 @@ import ca.uhn.hl7v2.model.v251.datatype.XPN;
 import ca.uhn.hl7v2.model.v251.datatype.XTN;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT;
-import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
 import ca.uhn.hl7v2.model.v251.message.ORU_R01;
 import ca.uhn.hl7v2.model.v251.segment.MSH;
 import ca.uhn.hl7v2.model.v251.segment.OBR;
@@ -63,7 +61,9 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	private QueueFile queueFile = null;
 	private TimerTask timerTask = null;
 	private Timer timer= null;
-//	private JSONObject ecr_json = null;
+
+	// Logger setup
+	final static Logger LOGGER = Logger.getLogger(HL7v2ReceiverApplication.class.getName());
 	
 	// Error Status
 	static int PID_ERROR = -1;
@@ -87,11 +87,6 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			queueFile = new QueueFile.Builder(file).build();
 		}
 		
-//		// Set up ECR template
-//		if (ecr_json == null) {
-//			ecr_json = parseJSONFile(ecr_template_filename);
-//		}
-//		
 		// After QueueFile is set up, we start background service.
 		if (timerTask == null)
 			timerTask = new QueueTaskTimer(this);
@@ -116,16 +111,20 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		// TODO: Implement this after discussing with LabCorp
 		
 		// Check the version = v2.5.1
-		if (theMessage.getVersion().equalsIgnoreCase("2.5.1") == false)
+		if (theMessage.getVersion().equalsIgnoreCase("2.5.1") == false) {
+			LOGGER.info("Message Received, but not not v2.5.1. Received message version is "+theMessage.getVersion());
 			return false;
+		}
 		
 		// Check the message type
 		Terser t = new Terser(theMessage);
 		try {
 			if (t.get("/MSH-9-1").equalsIgnoreCase("ORU") == false 
 					|| t.get("/MSH-9-2").equalsIgnoreCase("R01") == false
-					|| t.get("/MSH-9-3").equalsIgnoreCase("ORU_R01") == false)
+					|| t.get("/MSH-9-3").equalsIgnoreCase("ORU_R01") == false) {
+				LOGGER.info("Message with correct version received, but not ORU_R01 message type. Receved message type: "+t.get("/MSH-9-1")+" "+t.get("/MSH-9-2")+" "+t.get("/MSH-9-3"));
 				return false;
+			}
 		} catch (HL7Exception e) {
 			e.printStackTrace();
 			return false;
@@ -663,16 +662,21 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	}
 	
 	public int process_q() {
+		String ecr = "";
 		int ret = 0;
 		if (queueFile.isEmpty()) return ret;
 		boolean success = true;
 		try {
 			byte[] data = queueFile.peek();
-			String ecr = data.toString();
+			queueFile.remove();
+			ecr = new String (data, StandardCharsets.UTF_8);
+			System.out.println("ecr from queue("+queueFile.size()+"):"+ecr);
 			JSONObject ecrJson = new JSONObject (ecr);
 			send_ecr(ecrJson);
-		} catch (IOException e) {
+		} catch (JSONException e) {
 			success = false;
+			// We have ill-formed JSON. Remove it from queue.
+			LOGGER.error("Failed to process JSON data in Queue: "+e.getMessage()+"\nJSON data:"+ecr);
 			e.printStackTrace();
 		} catch (Exception e) {
 			success = false;
@@ -680,14 +684,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		}
 		
 		if (success) {
-			ret = 1;
-			try {
-				queueFile.remove();
-				ret = queueFile.size();
-			} catch (IOException e) {
-				ret = -1;
-				e.printStackTrace();
-			}
+			ret = queueFile.size();
 		} else {
 			ret = -1;
 		}
@@ -701,10 +698,11 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		Client client = Client.create();
 		WebResource webResource = client.resource(phcr_controller_api_url);
 		
-		System.out.println(ecrJson.toString());
-		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson);
+		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson.toString());
 		if (response.getStatus() != 201) {
 			// Failed to write ECR. We should put this in the queue and retry.
+			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
+//			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
 			queueFile.add(ecrJson.toString().getBytes());
 			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
 		} 

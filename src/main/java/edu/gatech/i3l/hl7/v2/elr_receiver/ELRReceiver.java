@@ -6,7 +6,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Executors;
+
+import org.apache.log4j.Logger;
 
 import ca.uhn.hl7v2.DefaultHapiContext;
 import ca.uhn.hl7v2.HL7Exception;
@@ -15,14 +16,8 @@ import ca.uhn.hl7v2.app.Connection;
 import ca.uhn.hl7v2.app.ConnectionListener;
 import ca.uhn.hl7v2.app.HL7Service;
 import ca.uhn.hl7v2.model.Message;
-import ca.uhn.hl7v2.model.v251.datatype.XPN;
-import ca.uhn.hl7v2.model.v251.message.ORU_R01;
-import ca.uhn.hl7v2.model.v251.segment.MSH;
-import ca.uhn.hl7v2.parser.Parser;
 import ca.uhn.hl7v2.protocol.ReceivingApplication;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationExceptionHandler;
-import ca.uhn.hl7v2.util.Hl7InputStreamMessageIterator;
-import ca.uhn.hl7v2.validation.builder.support.NoValidationBuilder;
 
 /**
  * HL7v2 Receiver
@@ -36,6 +31,10 @@ import ca.uhn.hl7v2.validation.builder.support.NoValidationBuilder;
  */
 public class ELRReceiver 
 {
+	// Logger setup
+	final static Logger LOGGER = Logger.getLogger(ELRReceiver.class.getName());
+	
+
 	static String default_port = "8888";
 	static String default_phcr_controller_api_url = "http://localhost:8888/ecr";
 	static boolean default_useTls = false;
