@@ -36,7 +36,7 @@ public class ELRReceiver
 	
 
 	static String default_port = "8888";
-	static String default_phcr_controller_api_url = "http://localhost:8888/ecr";
+	static String default_phcr_controller_api_url = "http://localhost:8888/ECR";
 	static boolean default_useTls = false;
 	static String default_useTls_str = "False";
 	static String default_qFileName = "queueECR";
