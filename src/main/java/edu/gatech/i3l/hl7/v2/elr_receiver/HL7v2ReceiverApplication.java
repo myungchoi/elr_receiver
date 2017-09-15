@@ -452,6 +452,20 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			reasons_json.put(reason_json);
 		}
 		
+		// Lab Order
+		JSONArray laborder_jsons;
+		if (patient_json.isNull("Lab Order Code")) {
+			laborder_jsons = new JSONArray();
+			patient_json.put("Lab Order Code", laborder_jsons);
+		} else {
+			laborder_jsons = patient_json.getJSONArray("Lab Order Code");
+		}
+		
+		JSONObject laborder_json = new JSONObject();
+		CE labOrderCE = orderRequest.getUniversalServiceIdentifier();
+		put_CE_to_json (labOrderCE, laborder_json);
+		laborder_jsons.put(laborder_json);
+
 		// Below is ORC ---
 		// Facility
 		JSONObject facility_json = new JSONObject();
@@ -630,7 +644,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 				return ErrorCode.PID;
 			}
 			
-			// Provider
+			// ORC/OBR Parsing
 			int totalOrderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATIONReps();
 			for (int j=0; j<totalOrderObs; j++) {
 				ORU_R01_ORDER_OBSERVATION orderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATION(j);
@@ -641,7 +655,8 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 				}
 			}
 			
-			// LabResults
+			// OBX Parse 
+			// TODO: Revisit this. This should be parsed inside ORC/OBR Parsing.
 			for (int j=0; j<totalOrderObs; j++) {
 				ORU_R01_ORDER_OBSERVATION orderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATION(j);
 				result = map_lab_results (orderObs, ecr_json);
@@ -702,9 +717,12 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		if (response.getStatus() != 201) {
 			// Failed to write ECR. We should put this in the queue and retry.
 			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
-//			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
+			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
 			queueFile.add(ecrJson.toString().getBytes());
 			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
-		} 
+		} else {
+			LOGGER.info("ECR Report submitted:"+ecrJson.toString());
+			System.out.println("ECR Report submitted:"+ecrJson.toString());
+		}
 	}
 }
