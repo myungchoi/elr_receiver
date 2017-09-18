@@ -289,7 +289,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		TS dateTimeDOB = pid_seg.getDateTimeOfBirth();
 		try {
 			if (dateTimeDOB.isEmpty() == false) {
-				patient_json.put("Birth Date", dateTimeDOB.getTime().getValue());
+				patient_json.put("Birth_Date", dateTimeDOB.getTime().getValue());
 			}
 		} catch (HL7Exception e) {
 			e.printStackTrace();
@@ -358,13 +358,13 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			XAD addressXAD = pid_seg.getPatientAddress(j);
 			String address = make_single_address (pid_seg.getPatientAddress(j));
 			if (address == "") continue;
-			patient_json.put("Street Address", address);
+			patient_json.put("Street_Address", address);
 			break;
 		}
 		
 		// Preferred Language
 		JSONObject patient_preferred_lang = new JSONObject();
-		patient_json.put("Preferred Language", patient_preferred_lang);
+		patient_json.put("Preferred_Language", patient_preferred_lang);
 		
 		CE primaryLangCE = pid_seg.getPrimaryLanguage();
 		put_CE_to_json(primaryLangCE, patient_preferred_lang);
@@ -402,13 +402,26 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		ecr_json.put("Provider", provider_json);
 		
 		OBR orderRequest = orderObs.getOBR();
-		int totalObr16 = orderRequest.getOrderingProviderReps();
-		for (int i=0; i<totalObr16; i++) {
-			XCN orderingProviderXCN = orderRequest.getOrderingProvider(i);
+		ORC common_order = orderObs.getORC();
+
+		int totalProviders = orderRequest.getOrderingProviderReps();
+		String type = "OBR";
+		if (totalProviders == 0) {
+			totalProviders = common_order.getOrderingProviderReps();
+			type = "ORC";
+		}
+		
+		for (int i=0; i<totalProviders; i++) {
+			XCN orderingProviderXCN;
+			if (type.equalsIgnoreCase("OBR"))
+				orderingProviderXCN = orderRequest.getOrderingProvider(i);
+			else
+				orderingProviderXCN = common_order.getOrderingProvider(i);
 			
 			String orderingProviderID = orderingProviderXCN.getIDNumber().getValueOrEmpty();
 			if (!orderingProviderID.isEmpty()) {
-				provider_json.put("ID", orderingProviderID);
+// TODO: remove this comment.
+//				provider_json.put("ID", orderingProviderID);
 				ret = 1;
 			}
 		
@@ -438,11 +451,11 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		
 		// Observation Time
 		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
-		patient_json.put("Visit DateTime", observationTime);
+		patient_json.put("Visit_DateTime", observationTime);
 		
 		// Reason for Study		
 		JSONArray reasons_json = new JSONArray();
-		patient_json.put("Trigger Code", reasons_json);
+		patient_json.put("Trigger_Code", reasons_json);
 		
 		int totalReasons = orderRequest.getReasonForStudyReps();
 		for (int i=0; i<totalReasons; i++) {
@@ -453,26 +466,25 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		}
 		
 		// Lab Order
-		JSONArray laborder_jsons;
-		if (patient_json.isNull("Lab Order Code")) {
-			laborder_jsons = new JSONArray();
-			patient_json.put("Lab Order Code", laborder_jsons);
-		} else {
-			laborder_jsons = patient_json.getJSONArray("Lab Order Code");
-		}
+//		JSONArray laborder_jsons;
+//		if (patient_json.isNull("Lab_Order_Code")) {
+//			laborder_jsons = new JSONArray();
+//			patient_json.put("Lab_Order_Code", laborder_jsons);
+//		} else {
+//			laborder_jsons = patient_json.getJSONArray("Lab_Order_Code");
+//		}
 		
 		JSONObject laborder_json = new JSONObject();
 		CE labOrderCE = orderRequest.getUniversalServiceIdentifier();
 		put_CE_to_json (labOrderCE, laborder_json);
-		laborder_jsons.put(laborder_json);
+		patient_json.put("Lab_Order_Code", laborder_json.get("Code"));
+//		laborder_jsons.put(laborder_json);
 
 		// Below is ORC ---
 		// Facility
 		JSONObject facility_json = new JSONObject();
 		ecr_json.put("Facility", facility_json);
-		
-		ORC common_order = orderObs.getORC();
-		
+				
 		// Facility Name
 		int totalFacilityNames = common_order.getOrderingFacilityNameReps();
 		for (int i=0; i<totalFacilityNames; i++) {
@@ -541,13 +553,13 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		}
 		
 		// Below is OBSERVATION Section, which contains OBX. Laboratory Results
-		JSONArray labResults_json;
-		if (patient_json.isNull("Laboratory Results")) {
-			labResults_json = new JSONArray();
-			patient_json.put("Laboratory Results", labResults_json);
-		} else {
-			labResults_json = patient_json.getJSONArray("Laboratory Results");
-		}
+//		JSONArray labResults_json;
+//		if (patient_json.isNull("Laboratory_Results")) {
+//			labResults_json = new JSONArray();
+//			patient_json.put("Laboratory_Results", labResults_json);
+//		} else {
+//			labResults_json = patient_json.getJSONArray("Laboratory_Results");
+//		}
 			
 		int totalObservations = orderObs.getOBSERVATIONReps();
 		for (int i=0; i<totalObservations; i++) {
@@ -583,7 +595,8 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 				labResult_json.put("Date", obxDate.getTime().getValue());
 			}
 			
-			labResults_json.put(labResult_json);
+//			labResults_json.put(labResult_json);
+			patient_json.put("Laboratory_Results", labResult_json);
 			ret++;
 		}
 		
