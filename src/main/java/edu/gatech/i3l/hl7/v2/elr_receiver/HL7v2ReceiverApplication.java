@@ -766,23 +766,22 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	private void send_ecr(JSONObject ecrJson) 
 		throws Exception {
 
-		System.out.println("ECR Report submitted:"+ecrJson.toString());
-
-		return;
+//		System.out.println("ECR Report submitted:"+ecrJson.toString());
+//		return;
 		
-//		Client client = Client.create();
-//		WebResource webResource = client.resource(phcr_controller_api_url);
-//		
-//		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson.toString());
-//		if (response.getStatus() != 201) {
-//			// Failed to write ECR. We should put this in the queue and retry.
-//			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
-//			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
-//			queueFile.add(ecrJson.toString().getBytes());
-//			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
-//		} else {
-//			LOGGER.info("ECR Report submitted:"+ecrJson.toString());
-//			System.out.println("ECR Report submitted:"+ecrJson.toString());
-//		}
+		Client client = Client.create();
+		WebResource webResource = client.resource(phcr_controller_api_url);
+		
+		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson.toString());
+		if (response.getStatus() != 201) {
+			// Failed to write ECR. We should put this in the queue and retry.
+			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
+			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
+			queueFile.add(ecrJson.toString().getBytes());
+			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
+		} else {
+			LOGGER.info("ECR Report submitted:"+ecrJson.toString());
+			System.out.println("ECR Report submitted:"+ecrJson.toString());
+		}
 	}
 }
