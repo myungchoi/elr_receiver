@@ -36,6 +36,7 @@ import ca.uhn.hl7v2.model.v251.datatype.XPN;
 import ca.uhn.hl7v2.model.v251.datatype.XTN;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT;
+import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
 import ca.uhn.hl7v2.model.v251.message.ORU_R01;
 import ca.uhn.hl7v2.model.v251.segment.MSH;
 import ca.uhn.hl7v2.model.v251.segment.OBR;
@@ -180,7 +181,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		return ret;
 	}
 	
-	private void put_CE_to_json (CE element, JSONObject json_obj) {
+	private int put_CE_to_json (CE element, JSONObject json_obj) {
 		String System = element.getNameOfCodingSystem().getValueOrEmpty();
 		String Code = element.getIdentifier().getValueOrEmpty();
 		String Display = element.getText().getValueOrEmpty();
@@ -189,10 +190,12 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			json_obj.put("System", element.getNameOfAlternateCodingSystem().getValueOrEmpty());
 			json_obj.put("Code", element.getAlternateIdentifier().getValueOrEmpty());
 			json_obj.put("Display", element.getAlternateText().getValueOrEmpty());
+			return -1;
 		} else {
 			json_obj.put("System", System);
 			json_obj.put("Code", Code);
-			json_obj.put("Display", Display);					
+			json_obj.put("Display", Display);	
+			return 0;
 		}
 	}
 
@@ -353,9 +356,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 
 		// Address
 		int totAddresses = pid_seg.getPatientAddressReps();
-		int weight = 0;
 		for (int j=0; j<totAddresses; j++) {
-			XAD addressXAD = pid_seg.getPatientAddress(j);
 			String address = make_single_address (pid_seg.getPatientAddress(j));
 			if (address == "") continue;
 			patient_json.put("Street_Address", address);
@@ -364,46 +365,42 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		
 		// Preferred Language
 		JSONObject patient_preferred_lang = new JSONObject();
-		patient_json.put("Preferred_Language", patient_preferred_lang);
 		
 		CE primaryLangCE = pid_seg.getPrimaryLanguage();
-		put_CE_to_json(primaryLangCE, patient_preferred_lang);
+		if (put_CE_to_json(primaryLangCE, patient_preferred_lang) == 0)
+			patient_json.put("Preferred_Language", patient_preferred_lang);
 		
 		// Ethnicity
 		JSONObject patient_ethnicity = new JSONObject();
-		patient_json.put("Ethnicity", patient_ethnicity);
-		
 		int totEthnicity = pid_seg.getEthnicGroupReps();
 		for (int j=0; j<totEthnicity; j++) {
 			CE ethnicityCE = pid_seg.getEthnicGroup(j);
-			put_CE_to_json(ethnicityCE, patient_ethnicity);
+			if (put_CE_to_json(ethnicityCE, patient_ethnicity) == 0)
+				patient_json.put("Ethnicity", patient_ethnicity);
 		}
 		
 		return 1;
 	}
-
+		
 	/*
-	 * 		 * ORDER OBSERVATION List
+	 *   ORDER OBSERVATION List
 	 *   OBR-16. Use ORC-12 if OBR-16 is empty.
 	 */
-	private int map_order_observation (ORU_R01_ORDER_OBSERVATION orderObs, JSONObject ecr_json) {
-		int ret = 0;
-		// Get patient json object.
-		JSONObject patient_json;
-		if (ecr_json.isNull("Patient")) {
-			patient_json = new JSONObject();
-			ecr_json.put("Patient", patient_json);
-		} else {
-			patient_json = ecr_json.getJSONObject("Patient");
-		}
-	
-		// Provider
-		JSONObject provider_json = new JSONObject();
-		ecr_json.put("Provider", provider_json);
+	private JSONObject map_order_observation (ORU_R01_ORDER_OBSERVATION orderObs) {
+		// Create a lab order JSON and put it in the lab order array.
+		JSONObject ecr_laborder_json = new JSONObject();
 		
+		// Get OBR and ORC information.
 		OBR orderRequest = orderObs.getOBR();
 		ORC common_order = orderObs.getORC();
 
+		// Get lab order information. This is a coded element.
+		CE labOrderCE = orderRequest.getUniversalServiceIdentifier();
+		put_CE_to_json (labOrderCE, ecr_laborder_json);
+
+		// Provider. We have provider information in OBR and ORC. We check if we OBR has
+		// a provider information. If not, we try with ORC.
+		JSONObject provider_json = new JSONObject();
 		int totalProviders = orderRequest.getOrderingProviderReps();
 		String type = "OBR";
 		if (totalProviders == 0) {
@@ -411,6 +408,8 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			type = "ORC";
 		}
 		
+		// There may be multiple providers. But, we hold only one provider per order.
+		boolean ok_to_put = false;
 		for (int i=0; i<totalProviders; i++) {
 			XCN orderingProviderXCN;
 			if (type.equalsIgnoreCase("OBR"))
@@ -420,9 +419,8 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			
 			String orderingProviderID = orderingProviderXCN.getIDNumber().getValueOrEmpty();
 			if (!orderingProviderID.isEmpty()) {
-// TODO: remove this comment.
-//				provider_json.put("ID", orderingProviderID);
-				ret = 1;
+				provider_json.put("ID", orderingProviderID);
+				ok_to_put = true;
 			}
 		
 			String providerFamily = orderingProviderXCN.getFamilyName().getFn1_Surname().getValueOrEmpty();
@@ -441,7 +439,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			orderingProviderName = orderingProviderName.trim();
 			if (!orderingProviderName.isEmpty()) {
 				provider_json.put("Name", orderingProviderName);
-				ret = 1;
+				ok_to_put = true;
 			}
 			
 			if (!orderingProviderID.isEmpty() && !orderingProviderName.isEmpty()) {
@@ -449,59 +447,52 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			}
 		}
 		
+		if (ok_to_put) ecr_laborder_json.put("Provider", provider_json);		
+		
 		// Observation Time
 		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
-		patient_json.put("Visit_DateTime", observationTime);
+		if (observationTime != null && !observationTime.isEmpty())
+			ecr_laborder_json.put("DateTime", observationTime);
 		
 		// Reason for Study		
 		JSONArray reasons_json = new JSONArray();
-		patient_json.put("Trigger_Code", reasons_json);
-		
 		int totalReasons = orderRequest.getReasonForStudyReps();
+		ok_to_put = false;
 		for (int i=0; i<totalReasons; i++) {
 			CE reasonCE = orderRequest.getReasonForStudy(i);
 			JSONObject reason_json = new JSONObject();
-			put_CE_to_json (reasonCE, reason_json);
-			reasons_json.put(reason_json);
+			if (put_CE_to_json (reasonCE, reason_json) == 0) {
+				reasons_json.put(reason_json);
+				ok_to_put = true;
+			}
 		}
 		
-		// Lab Order
-//		JSONArray laborder_jsons;
-//		if (patient_json.isNull("Lab_Order_Code")) {
-//			laborder_jsons = new JSONArray();
-//			patient_json.put("Lab_Order_Code", laborder_jsons);
-//		} else {
-//			laborder_jsons = patient_json.getJSONArray("Lab_Order_Code");
-//		}
+		if (ok_to_put) ecr_laborder_json.put("Reasons", reasons_json);
 		
-		JSONObject laborder_json = new JSONObject();
-		CE labOrderCE = orderRequest.getUniversalServiceIdentifier();
-		put_CE_to_json (labOrderCE, laborder_json);
-		patient_json.put("Lab_Order_Code", laborder_json.get("Code"));
-//		laborder_jsons.put(laborder_json);
-
 		// Below is ORC ---
 		// Facility
+		// There may be multiple facilities. We get only one of them. 
+		ok_to_put = false;
 		JSONObject facility_json = new JSONObject();
-		ecr_json.put("Facility", facility_json);
-				
-		// Facility Name
 		int totalFacilityNames = common_order.getOrderingFacilityNameReps();
 		for (int i=0; i<totalFacilityNames; i++) {
 			XON orderFacilityXON = common_order.getOrderingFacilityName(i);
 			String orgName = orderFacilityXON.getOrganizationName().getValueOrEmpty();
 			if (!orgName.isEmpty()) {
+				ok_to_put = true;
 				facility_json.put("Name", orgName);
 				String orgID = orderFacilityXON.getIDNumber().getValue();
 				if (orgID != null) {
-					ret ++;
 					facility_json.put("ID", orgID);
-					break;
 				}
+				
+				// If we have orgID, then that's enough. break!
+				if (orgID != null) break;
 			}
 		}
 		
 		// Facility Phone Number
+		// There may be multiple phone numbers. We get only one.
 		int totalFacilityPhones = common_order.getOrderingFacilityPhoneNumberReps();
 		for (int i=0; i<totalFacilityPhones; i++) {
 			XTN orderFacilityPhoneXTN = common_order.getOrderingFacilityPhoneNumber(i);
@@ -513,96 +504,79 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			if (!country.isEmpty()) phone = country;
 			if (!area.isEmpty()) phone += "-"+area;
 			if (!local.isEmpty()) phone += "-"+local;
-			facility_json.put("Phone", phone);
+			
+			if (!phone.isEmpty()) {
+				ok_to_put = true;
+				facility_json.put("Phone", phone);
+			}
+			
 			if (!country.isEmpty() && !area.isEmpty() && !local.isEmpty()) {
-				ret++;
 				break;
 			} else {
 				String backward_phone = common_order.getOrderingFacilityPhoneNumber(i).getTelephoneNumber().getValueOrEmpty();
 				if (!backward_phone.isEmpty()) {
+					ok_to_put = true;
 					facility_json.put("Phone", backward_phone);
-					ret++;
 					break;
 				}
 			}
 		}
 		
 		// Facility Address
+		// There may be multiple facility addresses. We get only one.
 		int totalFacilityAddress = common_order.getOrderingProviderAddressReps();
 		for (int i=0; i<totalFacilityAddress; i++) {
 			XAD addressXAD = common_order.getOrderingProviderAddress(i);
 			String address = make_single_address (addressXAD);
 			if (address=="") continue;
+			ok_to_put = true;
 			facility_json.put("Address", address);
-			ret++;
 			break;
 		}
 		
-		return ret;
+		if (ok_to_put) ecr_laborder_json.put("Facility", facility_json);
+
+		return ecr_laborder_json;
 	}
 	
-	private int map_lab_results(ORU_R01_ORDER_OBSERVATION orderObs, JSONObject ecr_json) {
-		int ret = 0;
-
-		JSONObject patient_json;
-		if (ecr_json.isNull("Patient")) {
-			patient_json = new JSONObject();
-			ecr_json.put("Patient", patient_json);
-		} else {
-			patient_json = ecr_json.getJSONObject("Patient");
-		}
-		
-		// Below is OBSERVATION Section, which contains OBX. Laboratory Results
-//		JSONArray labResults_json;
-//		if (patient_json.isNull("Laboratory_Results")) {
-//			labResults_json = new JSONArray();
-//			patient_json.put("Laboratory_Results", labResults_json);
-//		} else {
-//			labResults_json = patient_json.getJSONArray("Laboratory_Results");
-//		}
+	/*
+	 * Lab Results (OBXes)
+	 */
+	private JSONObject map_lab_result(OBX obsResult) {
+		JSONObject labresult_json = new JSONObject();
 			
-		int totalObservations = orderObs.getOBSERVATIONReps();
-		for (int i=0; i<totalObservations; i++) {
-			JSONObject labResult_json = new JSONObject();
-			// get OBX
-			OBX obsResultOBX = orderObs.getOBSERVATION(i).getOBX();
-			CE obsCE = obsResultOBX.getObservationIdentifier();
-			put_CE_to_json(obsCE, labResult_json);
+		CE obsCE = obsResult.getObservationIdentifier();
+		put_CE_to_json(obsCE, labresult_json);
 			
-			// Add Value and Unit if appropriate.
-			String valueType = obsResultOBX.getValueType().getValueOrEmpty();
-			if (!valueType.isEmpty()) {
-				if (valueType.equalsIgnoreCase("NM") 
-						|| valueType.equalsIgnoreCase("ST")
-						|| valueType.equalsIgnoreCase("TX")) {
-					int totalValues = obsResultOBX.getObservationValueReps();
-					if (totalValues > 0) {
-						Varies obsValue = obsResultOBX.getObservationValue(0);
-						labResult_json.put("Value", obsValue.toString());
-						CE unitCE = obsResultOBX.getUnits();
-						if (unitCE != null) {
-							JSONObject unit_json = new JSONObject();
-							put_CE_to_json(unitCE, unit_json);
-							labResult_json.put("Unit", unit_json);
-						}
-					}
+		// Add Value and Unit if appropriate.
+		String valueType = obsResult.getValueType().getValueOrEmpty();
+		if (!valueType.isEmpty()) {
+//			if (valueType.equalsIgnoreCase("NM") 
+//					|| valueType.equalsIgnoreCase("ST")
+//					|| valueType.equalsIgnoreCase("TX")) {
+			int totalValues = obsResult.getObservationValueReps();
+			if (totalValues > 0) {
+				Varies obsValue = obsResult.getObservationValue(0);
+				labresult_json.put("Value", obsValue.getData());
+				CE unitCE = obsResult.getUnits();
+				if (unitCE != null) {
+					JSONObject unit_json = new JSONObject();
+					if (put_CE_to_json(unitCE, unit_json) == 0)
+						labresult_json.put("Unit", unit_json);
 				}
 			}
-			
-			// Put date.
-			TS obxDate = obsResultOBX.getDateTimeOfTheObservation();
-			if (obxDate != null) {
-				labResult_json.put("Date", obxDate.getTime().getValue());
-			}
-			
-//			labResults_json.put(labResult_json);
-			patient_json.put("Laboratory_Results", labResult_json);
-			ret++;
+//			}
 		}
 		
-		return ret;
-	}
+		// Put date: Not required by ECR. But, putting the date anyway...
+		TS obxDate = obsResult.getDateTimeOfTheObservation();
+		if (obxDate != null) {
+			labresult_json.put("Date", obxDate.getTime().getValue());
+		}
 		
+		return labresult_json;
+	}
+
 	private int set_sending_application(ORU_R01 msg, JSONObject ecr_json) {
 		String namespaceID = "";
 		String universalID = "";
@@ -637,19 +611,23 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		// Investigate Patient Result Group
 		// see http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7%20v2.5.1&triggerEvent=ORU_R01
 		//
-		JSONObject ecr_json = new JSONObject();
-		
-		// Set sending application.
-		int res = set_sending_application(msg, ecr_json);
-		if (res < 0) {
-			return ErrorCode.MSH;
-			
-		}
+		// There can be multiple Patient Results. We send ECR per patient.
 		int newECRs = 0;
 		int totalRepPatientResult = msg.getPATIENT_RESULTReps();
 		for (int i=0; i<totalRepPatientResult; i++) {
+			// Create a new empty ECR JSON.
+			JSONObject ecr_json = new JSONObject();
+			
+			// Set sending application.
+			int res = set_sending_application(msg, ecr_json);
+			if (res < 0) {
+				return ErrorCode.MSH;
+				
+			}
+
 			// Patient specific information
-			ORU_R01_PATIENT patient = msg.getPATIENT_RESULT(i).getPATIENT();
+			ORU_R01_PATIENT_RESULT patient_result = msg.getPATIENT_RESULT(i);
+			ORU_R01_PATIENT patient = patient_result.getPATIENT();
 			int result = map_patient (patient, ecr_json);
 			if (result >= 0)
 				newECRs = newECRs+result;
@@ -657,27 +635,92 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 				return ErrorCode.PID;
 			}
 			
+			// We should have the patient populated.
+			JSONObject patient_json;
+			if (ecr_json.isNull("Patient")) {
+				// This means the HL7v2 message has no patient demographic information.
+				// This shouldn't happen. But, anything can happen in the real world. So,
+				// we don't stop here. We are moving on.
+				patient_json = new JSONObject();
+				ecr_json.put("Patient", patient_json);
+			} else {
+				patient_json = ecr_json.getJSONObject("Patient");
+			}
+
 			// ORC/OBR Parsing
+			JSONArray laborders_json = new JSONArray();
+			
+			// This is a new JSON Array object. Put it in the patient section.
+			patient_json.put("Lab_Order_Code", laborders_json);
+
 			int totalOrderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATIONReps();
 			for (int j=0; j<totalOrderObs; j++) {
-				ORU_R01_ORDER_OBSERVATION orderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATION(j);
-				result = map_order_observation (orderObs, ecr_json);
-				if (result > 0) break;
-				else if (result < 0) {
+				ORU_R01_ORDER_OBSERVATION orderObs = patient_result.getORDER_OBSERVATION(j);
+				JSONObject laborder_json = map_order_observation (orderObs);
+				if (laborder_json == null) {
 					return ErrorCode.ORDER_OBSERVATION;
 				}
-			}
-			
-			// OBX Parse 
-			// TODO: Revisit this. This should be parsed inside ORC/OBR Parsing.
-			for (int j=0; j<totalOrderObs; j++) {
-				ORU_R01_ORDER_OBSERVATION orderObs = msg.getPATIENT_RESULT(i).getORDER_OBSERVATION(j);
-				result = map_lab_results (orderObs, ecr_json);
-				if (result < 0) {
-					return ErrorCode.LAB_RESULTS;
+				laborders_json.put(laborder_json);
+				
+				// We add lab results to lab order.
+				JSONArray labresults_json = new JSONArray();
+				laborder_json.put("Laboratory_Results", labresults_json);
+				int totalObservations = orderObs.getOBSERVATIONReps();
+				for (int k=0; k<totalObservations; k++) {
+					OBX obsResult = orderObs.getOBSERVATION(k).getOBX();
+					JSONObject labresult_json = map_lab_result (obsResult);
+					if (labresult_json == null) {
+						return ErrorCode.LAB_RESULTS;
+					}
+					labresults_json.put(labresult_json);
+				}
+				
+				// For each order, we have provider, facility, order date and reason information.
+				// We put this information in the high level.
+				//
+				// Provider and Facility at Top ECR level.
+				// Order Date and Reason at Patient level.
+				//
+				// Provider and Facility: 
+				// We are in the Order Loop. So, we will come back. However, 
+				// ECR allows only one provider and facility. So, this can be overwritten
+				// by next order if provider info exists.
+				if (!laborder_json.isNull("Provider")) {
+					JSONObject provider_json = laborder_json.getJSONObject("Provider");
+					if (provider_json != null) ecr_json.put("Provider", provider_json);
+				}
+				
+				if (!laborder_json.isNull("Facility")) {
+					JSONObject facility_json = laborder_json.getJSONObject("Facility");
+					if (facility_json != null) ecr_json.put("Facility", facility_json);
+				}
+				
+				// Order Date and Reason. 
+				// We have Visit DateTime in ECR. We will put order date as a visit date
+				// as the order usually made when a patient visits a clinic.
+				if (!laborder_json.isNull("DateTime")) {
+					JSONObject orderDate_json = laborder_json.getJSONObject("DateTime");
+					if (orderDate_json != null) patient_json.put("Visit_DateTime", orderDate_json);
+				}
+				
+				// We have reasons in lab order. We put this in the trigger code.
+				if (!laborder_json.isNull("Reasons")) {
+					JSONArray reasons_json = laborder_json.getJSONArray("Reasons");
+					JSONArray triggercode_json;
+					if (patient_json.isNull("Tigger_Code")) {
+						triggercode_json = new JSONArray();
+						patient_json.put("Trigger_Code", triggercode_json);
+					} else {
+						triggercode_json = patient_json.getJSONArray("Trigger_Code");
+					}
+					if (reasons_json != null) {
+						for (int c=0; c<reasons_json.length(); c++) {
+							triggercode_json.put(reasons_json.get(c));
+						}
+					}
 				}
 			}
-			
+						
 			try {
 				send_ecr (ecr_json);
 			} catch (Exception e) {
@@ -722,20 +765,24 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	
 	private void send_ecr(JSONObject ecrJson) 
 		throws Exception {
+
+		System.out.println("ECR Report submitted:"+ecrJson.toString());
+
+		return;
 		
-		Client client = Client.create();
-		WebResource webResource = client.resource(phcr_controller_api_url);
-		
-		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson.toString());
-		if (response.getStatus() != 201) {
-			// Failed to write ECR. We should put this in the queue and retry.
-			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
-			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
-			queueFile.add(ecrJson.toString().getBytes());
-			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
-		} else {
-			LOGGER.info("ECR Report submitted:"+ecrJson.toString());
-			System.out.println("ECR Report submitted:"+ecrJson.toString());
-		}
+//		Client client = Client.create();
+//		WebResource webResource = client.resource(phcr_controller_api_url);
+//		
+//		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson.toString());
+//		if (response.getStatus() != 201) {
+//			// Failed to write ECR. We should put this in the queue and retry.
+//			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
+//			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
+//			queueFile.add(ecrJson.toString().getBytes());
+//			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
+//		} else {
+//			LOGGER.info("ECR Report submitted:"+ecrJson.toString());
+//			System.out.println("ECR Report submitted:"+ecrJson.toString());
+//		}
 	}
 }
