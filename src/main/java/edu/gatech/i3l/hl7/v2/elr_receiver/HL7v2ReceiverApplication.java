@@ -769,7 +769,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 //		System.out.println("ECR Report submitted:"+ecrJson.toString());
 //		return;
 //Todo: Deal with this later. Just add ID for now.
-		ecrJson.put("ID", "1234");
+		ecrJson.put("id", "1234");
 		
 		Client client = Client.create();
 		WebResource webResource = client.resource(phcr_controller_api_url);
