@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.sql.Timestamp;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -769,7 +770,9 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 //		System.out.println("ECR Report submitted:"+ecrJson.toString());
 //		return;
 //Todo: Deal with this later. Just add ID for now.
-		ecrJson.put("ID", "1234");
+		Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+		Long id_num = timestamp.getTime();
+		ecrJson.put("id", id_num.toString());
 		
 		Client client = Client.create();
 		WebResource webResource = client.resource(phcr_controller_api_url);
