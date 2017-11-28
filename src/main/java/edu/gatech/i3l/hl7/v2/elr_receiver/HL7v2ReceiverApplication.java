@@ -771,7 +771,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 //		return;
 //Todo: Deal with this later. Just add ID for now.
 		Timestamp timestamp = new Timestamp(System.currentTimeMillis());
-		Long id_num = timestamp.getTime();
+		Long id_num = (Long) (timestamp.getTime()/10000);
 		ecrJson.put("id", id_num.toString());
 		
 		Client client = Client.create();
