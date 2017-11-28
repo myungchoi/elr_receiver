@@ -778,7 +778,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		WebResource webResource = client.resource(phcr_controller_api_url);
 		
 		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson.toString());
-		if (response.getStatus() != 201) {
+		if (response.getStatus() != 201 && response.getStatus() != 200) {
 			// Failed to write ECR. We should put this in the queue and retry.
 			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
 			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
