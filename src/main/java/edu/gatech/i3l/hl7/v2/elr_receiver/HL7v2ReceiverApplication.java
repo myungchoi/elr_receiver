@@ -200,6 +200,30 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		}
 	}
 
+	private JSONObject constructPatientIDfromPID34 (CX cxObject) {
+		JSONObject patient_json_id = new JSONObject();
+
+		String patientID = cxObject.getIDNumber().getValue();
+		patient_json_id.put("value", patientID);
+
+		// Rest of Extended Composite ID are all optional. So, we get
+		// them if available.
+		HD pIdAssignAuth = cxObject.getAssigningAuthority();
+		if (pIdAssignAuth != null) {
+			String AssignAuthName = pIdAssignAuth.getNamespaceID().getValueOrEmpty();
+
+			// Patient ID Number and Assigning Authority Name Space (user defined)
+			// will probably sufficient to check.
+			if (!AssignAuthName.isEmpty()) {
+//				if (AssignAuthName.equalsIgnoreCase("EMR")) {
+//					break;
+//				}
+				patient_json_id.put("type", AssignAuthName);
+			}
+		}
+		
+		return patient_json_id;
+	}
 	/*
 	 * We selects the patient ID that has assigned auth
 	 * name as "EMR". If this does not exist, then we choose the last patient ID from the list.
@@ -218,7 +242,6 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 	 * 
 	 */
 	private int map_patient (ORU_R01_PATIENT patient, JSONObject ecr_json) {
-		String patientID = "";
 		String patientName_last = "";
 		String patientName_given = "";
 		String patientName_middle = "";
@@ -236,28 +259,24 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 //		JSONObject patient_json = ecr_json.getJSONObject("Patient");
 
 		// Patient information itself
+		// We store PID-3 and PID-4
 		PID pid_seg = patient.getPID();
-		int totPID3 = pid_seg.getPid3_PatientIdentifierListReps();
+		JSONArray patient_json_id_list = new JSONArray();
+		patient_json.put("id", patient_json_id_list);
+		
+		int totPID3 = pid_seg.getPid3_PatientIdentifierListReps();		
 		for (int j=0; j<totPID3; j++) {
 			CX pIdentifier = pid_seg.getPid3_PatientIdentifierList(j);
-			
-			// From PID-3-1 (ID Number) is REQUIRED. So, get this one.
-			patientID = pIdentifier.getIDNumber().getValue();
-			
-			// Rest of Extended Composite ID are all optional. So, we get
-			// them if available.
-			HD pIdAssignAuth = pIdentifier.getAssigningAuthority();
-			String AssignAuthName = pIdAssignAuth.getNamespaceID().getValueOrEmpty();
-
-			// Patient ID Number and Assigning Authority Name Space (user defined)
-			// will probably sufficient to check.
-			if (!AssignAuthName.isEmpty()) {
-				if (AssignAuthName.equalsIgnoreCase("EMR")) {
-					break;
-				}
-			}
+			patient_json_id_list.put(constructPatientIDfromPID34(pIdentifier));
 		}
+
+		int totPID4 = pid_seg.getPid4_AlternatePatientIDPIDReps();
 		
+		for (int j=0; j<totPID4; j++) {
+			CX pAlternateID = pid_seg.getPid4_AlternatePatientIDPID(j);
+			patient_json_id_list.put(constructPatientIDfromPID34(pAlternateID));
+		}
+
 		int totPatientNames = pid_seg.getPid5_PatientNameReps();
 		for (int j=0; j<totPatientNames; j++) {
 			XPN patientName_xpn = pid_seg.getPid5_PatientName(j);
@@ -277,7 +296,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 					
 		// We need patient id or name for rest to be useful. 
 		// If not, we move to the next patient result.
-		if (patientID == "" 
+		if (patient_json.getJSONArray("id").length() == 0 
 				&& (patientName_given.isEmpty() && patientName_last.isEmpty()))
 			return 0;
 		
@@ -285,7 +304,6 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		JSONObject patient_name = new JSONObject();
 		patient_json.put("Name", patient_name);
 		
-		patient_json.put("ID", patientID);
 		patient_name.put("given", patientName_given);
 		patient_name.put("family", patientName_last);
 		
@@ -399,9 +417,10 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		CE labOrderCE = orderRequest.getUniversalServiceIdentifier();
 		put_CE_to_json (labOrderCE, ecr_laborder_json);
 
-		// Provider. We have provider information in OBR and ORC. We check if we OBR has
-		// a provider information. If not, we try with ORC.
 		JSONObject provider_json = new JSONObject();
+		// To support LAB where ELR is coming from laboratory,
+		// we have provider information in OBR and ORC. We check if we OBR has
+		// a provider information. If not, we try with ORC.
 		int totalProviders = orderRequest.getOrderingProviderReps();
 		String type = "OBR";
 		if (totalProviders == 0) {
@@ -418,9 +437,12 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			else
 				orderingProviderXCN = common_order.getOrderingProvider(i);
 			
+			JSONObject orderingProvider_json_ID = new JSONObject();
 			String orderingProviderID = orderingProviderXCN.getIDNumber().getValueOrEmpty();
 			if (!orderingProviderID.isEmpty()) {
-				provider_json.put("ID", orderingProviderID);
+				orderingProvider_json_ID.put("value", orderingProviderID);
+				orderingProvider_json_ID.put("type", "ORDPROVIDER");
+				provider_json.put("ID", orderingProvider_json_ID);
 				ok_to_put = true;
 			}
 		
@@ -578,31 +600,63 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 		return labresult_json;
 	}
 
-	private int set_sending_application(ORU_R01 msg, JSONObject ecr_json) {
-		String namespaceID = "";
-		String universalID = "";
-		String universalIDType = "";
+	private void add_provider(JSONObject provider, JSONObject ecr_json) {
+		JSONArray providers_json;
+		
+		if (ecr_json.isNull("Provider")) {
+			providers_json = new JSONArray();
+			ecr_json.put("Provider", providers_json);
+		} else {
+			providers_json = ecr_json.getJSONArray("Provider");
+		}
+
+		providers_json.put(provider);
+	}
+	
+	private int set_sending_appfac(ORU_R01 msg, JSONObject ecr_json) {
+		String appNamespaceID = "";
+		String appUniversalID = "";
+		String appUniversalIDType = "";
 		
 		MSH msh = msg.getMSH();
 		HD sendingAppHD = msh.getSendingApplication();
 		if (sendingAppHD != null) {
-			namespaceID = sendingAppHD.getNamespaceID().getValueOrEmpty();
-			universalID = sendingAppHD.getUniversalID().getValueOrEmpty();
-			universalIDType = sendingAppHD.getUniversalIDType().getValueOrEmpty();
+			appNamespaceID = sendingAppHD.getNamespaceID().getValueOrEmpty();
+			appUniversalID = sendingAppHD.getUniversalID().getValueOrEmpty();
+			appUniversalIDType = sendingAppHD.getUniversalIDType().getValueOrEmpty();
 		}
 		
 		String sendingApp = "";
-		if (!namespaceID.isEmpty())
-			sendingApp = namespaceID+" ";
-		if (!universalID.isEmpty())
-			sendingApp += universalID+" ";
-		if (!universalIDType.isEmpty())
-			sendingApp += universalIDType;
+		if (!appNamespaceID.isEmpty())
+			sendingApp = appNamespaceID+" ";
+		if (!appUniversalID.isEmpty())
+			sendingApp += appUniversalID+" ";
+		if (!appUniversalIDType.isEmpty())
+			sendingApp += appUniversalIDType;
 		
 		sendingApp = sendingApp.trim();
 		
 		ecr_json.put("Sending Application", sendingApp);
 		
+		// Provider: We collect from multiple places 
+		// To support HIE where ELR is coming from hospital, we
+		// use sending application and facility as a provider.
+		String facNamespaceID = "";
+		HD sendingFacHD = msh.getSendingFacility();
+		if (sendingFacHD != null) {
+			facNamespaceID = sendingFacHD.getNamespaceID().getValueOrEmpty();
+		}
+		
+		String provider_string = appNamespaceID+"|"+facNamespaceID;
+		
+		JSONObject provider_json_id = new JSONObject();
+		provider_json_id.put("value", provider_string);
+		provider_json_id.put("type", "appfac");
+		JSONObject provider_json = new JSONObject();
+		provider_json.put("ID", provider_json_id);
+		
+		add_provider(provider_json, ecr_json);
+
 		return 0;
 	}
 	
@@ -620,7 +674,7 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 			JSONObject ecr_json = new JSONObject();
 			
 			// Set sending application.
-			int res = set_sending_application(msg, ecr_json);
+			int res = set_sending_appfac(msg, ecr_json);
 			if (res < 0) {
 				return ErrorCode.MSH;
 				
@@ -688,8 +742,9 @@ public class HL7v2ReceiverApplication implements ReceivingApplication<Message> {
 				// by next order if provider info exists.
 				if (!laborder_json.isNull("Provider")) {
 					JSONObject provider_json = laborder_json.getJSONObject("Provider");
-					if (provider_json != null) ecr_json.put("Provider", provider_json);
-				}
+					if (provider_json != null) 
+						add_provider (provider_json, ecr_json);
+				}				
 				
 				if (!laborder_json.isNull("Facility")) {
 					JSONObject facility_json = laborder_json.getJSONObject("Facility");
