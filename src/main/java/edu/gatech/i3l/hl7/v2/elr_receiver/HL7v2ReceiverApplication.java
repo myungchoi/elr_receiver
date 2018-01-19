@@ -20,6 +20,7 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
+import ca.uhn.hl7v2.DefaultHapiContext;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
 import ca.uhn.hl7v2.model.v231.group.ORU_R01_ORCOBRNTEOBXNTECTI;
@@ -45,7 +46,6 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 	private QueueFile queueFile = null;
 	private TimerTask timerTask = null;
 	private Timer timer= null;
-	private String myVersion = "2.5.1";
 	private v myParser = null;
 
 	// Logger setup
@@ -99,10 +99,8 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 		// Check the version = v2.5.1 or v2.3.1
 		
 		if (theMessage.getVersion().equalsIgnoreCase("2.5.1") == true) {
-			myVersion = "2.5.1";
 			myParser = (v) new HL7v251Parser();
 		} else if (theMessage.getVersion().equalsIgnoreCase("2.3.1") == true) {
-			myVersion = "2.3.1";
 			myParser = (v) new HL7v231Parser();
 		} else {
 			LOGGER.info("Message Received, but neither v2.5.1 nor v2.3.1. Received message version is "+theMessage.getVersion());
@@ -112,9 +110,13 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 		// Check the message type
 		Terser t = new Terser(theMessage);
 		try {
-			if (t.get("/MSH-9-1").equalsIgnoreCase("ORU") == false 
-					|| t.get("/MSH-9-2").equalsIgnoreCase("R01") == false
-					|| t.get("/MSH-9-3").equalsIgnoreCase("ORU_R01") == false) {
+			String MSH91 = t.get("/MSH-9-1");
+			String MSH92 = t.get("/MSH-9-2");
+			String MSH93 = t.get("/MSH-9-3");
+			
+			if ((MSH91 != null && MSH91.equalsIgnoreCase("ORU") == false) 
+					|| (MSH92 != null && MSH92.equalsIgnoreCase("R01") == false)
+					|| (MSH93 != null && MSH93.equalsIgnoreCase("ORU_R01") == false)) {
 				LOGGER.info("Message with correct version received, but not ORU_R01 message type. Receved message type: "+t.get("/MSH-9-1")+" "+t.get("/MSH-9-2")+" "+t.get("/MSH-9-3"));
 				return false;
 			}
@@ -158,7 +160,7 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 					
 		int newECRs = 0;
 		int totalRepPatientResult;
-		if (myVersion.equalsIgnoreCase("2.3.1"))
+		if (myParser.myVersion.equalsIgnoreCase("2.3.1"))
 			totalRepPatientResult = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTIReps();
 		else
 			totalRepPatientResult = ((ca.uhn.hl7v2.model.v251.message.ORU_R01)msg).getPATIENT_RESULTReps();
@@ -175,7 +177,7 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 
 			// Patient specific information
 			Object patient;
-			if (myVersion.equalsIgnoreCase("2.3.1")) {
+			if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
 				ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI patient_result = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI(i);
 				patient = patient_result.getPIDPD1NK1NTEPV1PV2();
 			} else {
@@ -184,9 +186,9 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 			}
 			
 			int result = myParser.map_patient (patient, ecr_json);
-			if (result >= 0)
+			if (result == 0)
 				newECRs = newECRs++;
-			else if (result < 0) {
+			else {
 				return ErrorCode.PID;
 			}
 			
@@ -209,7 +211,7 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 			patient_json.put("Lab_Order_Code", laborders_json);
 
 			int totalOrderObs;
-			if (myVersion.equalsIgnoreCase("2.3.1")) {
+			if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
 				ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI patient_result = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI(i);
 				totalOrderObs = patient_result.getORCOBRNTEOBXNTECTIReps();
 			} else {
@@ -218,7 +220,7 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 			}
 			for (int j=0; j<totalOrderObs; j++) {
 				Object orderObs;
-				if (myVersion.equalsIgnoreCase("2.3.1")) {
+				if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
 					ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI patient_result = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI(i);
 					orderObs = patient_result.getORCOBRNTEOBXNTECTI(j);
 				} else {
@@ -237,14 +239,14 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 				laborder_json.put("Laboratory_Results", labresults_json);
 				
 				int totalObservations;
-				if (myVersion.equalsIgnoreCase("2.3.1")) {
+				if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
 					totalObservations = ((ORU_R01_ORCOBRNTEOBXNTECTI)orderObs).getOBXNTEReps();
 				} else {
 					totalObservations = ((ORU_R01_ORDER_OBSERVATION)orderObs).getOBSERVATIONReps();
 				}
 				for (int k=0; k<totalObservations; k++) {
 					Object obsResult;
-					if (myVersion.equalsIgnoreCase("2.3.1")) {
+					if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
 						obsResult = ((ORU_R01_ORCOBRNTEOBXNTECTI)orderObs).getOBXNTE(k).getOBX();
 					} else {
 						obsResult = ((ORU_R01_ORDER_OBSERVATION)orderObs).getOBSERVATION(k).getOBX();						
@@ -302,7 +304,7 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 					}
 				}
 			}
-						
+			
 			try {
 				send_ecr (ecr_json);
 			} catch (Exception e) {

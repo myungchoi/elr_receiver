@@ -28,26 +28,11 @@ import ca.uhn.hl7v2.model.v251.segment.ORC;
 import ca.uhn.hl7v2.model.v251.segment.PID;
 
 public class HL7v251Parser extends BaseHL7v2Parser {
-
-	private int put_CE_to_json (CE element, JSONObject json_obj) {
-		String System = element.getNameOfCodingSystem().getValueOrEmpty();
-		String Code = element.getIdentifier().getValueOrEmpty();
-		String Display = element.getText().getValueOrEmpty();
-		
-		if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
-			json_obj.put("System", element.getNameOfAlternateCodingSystem().getValueOrEmpty());
-			json_obj.put("Code", element.getAlternateIdentifier().getValueOrEmpty());
-			json_obj.put("Display", element.getAlternateText().getValueOrEmpty());
-			return -1;
-		} else {
-			json_obj.put("System", System);
-			json_obj.put("Code", Code);
-			json_obj.put("Display", Display);	
-			return 0;
-		}
+	public HL7v251Parser() {
+		myVersion = "2.5.1";
 	}
 
-	private JSONObject constructPatientIDfromPID34 (CX cxObject) {
+	private JSONObject constructPatientIDfromPID34 (CX cxObject, String type) {
 		JSONObject patient_json_id = new JSONObject();
 
 		String patientID = cxObject.getIDNumber().getValue();
@@ -66,6 +51,8 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 //					break;
 //				}
 				patient_json_id.put("type", AssignAuthName);
+			} else {
+				patient_json_id.put("type", type);
 			}
 		}
 		
@@ -142,14 +129,14 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		int totPID3 = pid_seg.getPid3_PatientIdentifierListReps();		
 		for (int j=0; j<totPID3; j++) {
 			CX pIdentifier = pid_seg.getPid3_PatientIdentifierList(j);
-			patient_json_id_list.put(constructPatientIDfromPID34(pIdentifier));
+			patient_json_id_list.put(constructPatientIDfromPID34(pIdentifier, "PATIENT_IDENTIFIER"));
 		}
 
 		int totPID4 = pid_seg.getPid4_AlternatePatientIDPIDReps();
 		
 		for (int j=0; j<totPID4; j++) {
 			CX pAlternateID = pid_seg.getPid4_AlternatePatientIDPID(j);
-			patient_json_id_list.put(constructPatientIDfromPID34(pAlternateID));
+			patient_json_id_list.put(constructPatientIDfromPID34(pAlternateID, "ALTERNATIVE_PATIENT_ID"));
 		}
 
 		int totPatientNames = pid_seg.getPid5_PatientNameReps();
@@ -416,7 +403,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 			if (!country.isEmpty() && !area.isEmpty() && !local.isEmpty()) {
 				break;
 			} else {
-				String backward_phone = common_order.getOrderingFacilityPhoneNumber(i).getTelephoneNumber().getValueOrEmpty();
+				String backward_phone = orderFacilityPhoneXTN.getTelephoneNumber().getValueOrEmpty();
 				if (!backward_phone.isEmpty()) {
 					ok_to_put = true;
 					facility_json.put("Phone", backward_phone);
