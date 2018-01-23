@@ -283,7 +283,7 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 				// We have Visit DateTime in ECR. We will put order date as a visit date
 				// as the order usually made when a patient visits a clinic.
 				if (!laborder_json.isNull("DateTime")) {
-					JSONObject orderDate_json = laborder_json.getJSONObject("DateTime");
+					String orderDate_json = laborder_json.getString("DateTime");
 					if (orderDate_json != null) patient_json.put("Visit_DateTime", orderDate_json);
 				}
 				
