@@ -41,21 +41,30 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 
 		// Rest of Extended Composite ID are all optional. So, we get
 		// them if available.
-		HD pIdAssignAuth = cxObject.getAssigningAuthority();
-		if (pIdAssignAuth != null) {
-			String AssignAuthName = pIdAssignAuth.getNamespaceID().getValueOrEmpty();
-
-			// Patient ID Number and Assigning Authority Name Space (user defined)
-			// will probably sufficient to check.
-			if (!AssignAuthName.isEmpty()) {
-//				if (AssignAuthName.equalsIgnoreCase("EMR")) {
-//					break;
-//				}
-				patient_json_id.put("type", AssignAuthName);
-			} else {
+		ca.uhn.hl7v2.model.v231.datatype.IS pIdIdentifierTypeCode = cxObject.getIdentifierTypeCode();
+		if (pIdIdentifierTypeCode != null) {
+			String IdType = pIdIdentifierTypeCode.getValueOrEmpty();
+			if (IdType.isEmpty()) {
 				patient_json_id.put("type", type);
+			} else {
+				patient_json_id.put("type", IdType);
 			}
 		}
+//		HD pIdAssignAuth = cxObject.getAssigningAuthority();
+//		if (pIdAssignAuth != null) {
+//			String AssignAuthName = pIdAssignAuth.getNamespaceID().getValueOrEmpty();
+//			
+//			// Patient ID Number and Assigning Authority Name Space (user defined)
+//			// will probably sufficient to check.
+//			if (!AssignAuthName.isEmpty()) {
+////				if (AssignAuthName.equalsIgnoreCase("EMR")) {
+////					break;
+////				}
+//				patient_json_id.put("type", AssignAuthName);
+//			} else {
+//				patient_json_id.put("type", type);
+//			}
+//		}
 		
 		return patient_json_id;
 	}
