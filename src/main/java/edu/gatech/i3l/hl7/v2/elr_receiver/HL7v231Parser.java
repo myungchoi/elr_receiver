@@ -118,7 +118,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 		// We store PID-3 and PID-4
 		PID pid_seg = patient.getPID();
 		JSONArray patient_json_id_list = new JSONArray();
-		patient_json.put("id", patient_json_id_list);
+		patient_json.put("ID", patient_json_id_list);
 		
 		int totPID3 = pid_seg.getPatientIdentifierListReps();		
 		for (int j=0; j<totPID3; j++) {
@@ -158,7 +158,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 					
 		// We need patient id or name for rest to be useful. 
 		// If not, we move to the next patient result.
-		if (patient_json.getJSONArray("id").length() == 0 
+		if (patient_json.getJSONArray("ID").length() == 0 
 				&& (patientName_given.isEmpty() && patientName_last.isEmpty()))
 			return 0;
 		
