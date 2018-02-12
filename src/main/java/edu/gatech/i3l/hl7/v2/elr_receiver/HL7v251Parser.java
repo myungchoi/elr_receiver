@@ -45,7 +45,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		if (pIdIdentifierTypeCode != null) {
 			String IdType = pIdIdentifierTypeCode.getValueOrEmpty();
 			if (IdType.isEmpty()) {
-				patient_json_id.put("type", type);
+				patient_json_id.put("type", "MR");
 			} else {
 				patient_json_id.put("type", IdType);
 			}
@@ -348,6 +348,18 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 			}
 		}
 		
+		// Provider Address
+		// There may be multiple provider addresses. We get only one.
+		int totalProviderAddress = common_order.getOrderingProviderAddressReps();
+		for (int i=0; i<totalProviderAddress; i++) {
+			XAD addressXAD = common_order.getOrderingProviderAddress(i);
+			String address = make_single_address (addressXAD);
+			if (address=="") continue;
+			ok_to_put = true;
+			provider_json.put("Address", address);
+			break;
+		}
+		
 		if (ok_to_put) ecr_laborder_json.put("Provider", provider_json);		
 		
 		// Observation Time
@@ -397,6 +409,18 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		int totalFacilityPhones = common_order.getOrderingFacilityPhoneNumberReps();
 		for (int i=0; i<totalFacilityPhones; i++) {
 			XTN orderFacilityPhoneXTN = common_order.getOrderingFacilityPhoneNumber(i);
+			
+			// See if we have full phone number.
+			ST phoneNumberST = orderFacilityPhoneXTN.getTelephoneNumber();
+			if (phoneNumberST != null) {
+				String phoneNumber = phoneNumberST.getValue();
+				if (phoneNumber != null & !phoneNumber.isEmpty()) {
+					ok_to_put = true;
+					facility_json.put("Phone", phoneNumber);
+					break;
+				}
+			}
+			
 			String country = orderFacilityPhoneXTN.getCountryCode().getValue();
 			String area = orderFacilityPhoneXTN.getAreaCityCode().getValue();
 			String local = orderFacilityPhoneXTN.getLocalNumber().getValue();
@@ -425,9 +449,9 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		
 		// Facility Address
 		// There may be multiple facility addresses. We get only one.
-		int totalFacilityAddress = common_order.getOrderingProviderAddressReps();
+		int totalFacilityAddress = common_order.getOrderingFacilityAddressReps();
 		for (int i=0; i<totalFacilityAddress; i++) {
-			XAD addressXAD = common_order.getOrderingProviderAddress(i);
+			XAD addressXAD = common_order.getOrderingFacilityAddress(i);
 			String address = make_single_address (addressXAD);
 			if (address=="") continue;
 			ok_to_put = true;
