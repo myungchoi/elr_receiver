@@ -6,31 +6,32 @@ import org.json.JSONObject;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Varies;
 import ca.uhn.hl7v2.model.primitive.IS;
-import ca.uhn.hl7v2.model.v231.datatype.CX;
-import ca.uhn.hl7v2.model.v231.datatype.HD;
-import ca.uhn.hl7v2.model.v231.datatype.XAD;
-import ca.uhn.hl7v2.model.v231.datatype.XCN;
-import ca.uhn.hl7v2.model.v231.datatype.XON;
-import ca.uhn.hl7v2.model.v231.datatype.CE;
-import ca.uhn.hl7v2.model.v231.datatype.FN;
-import ca.uhn.hl7v2.model.v231.datatype.ST;
-import ca.uhn.hl7v2.model.v231.datatype.TS;
-import ca.uhn.hl7v2.model.v231.datatype.TSComponentOne;
-import ca.uhn.hl7v2.model.v231.datatype.XPN;
-import ca.uhn.hl7v2.model.v231.datatype.XTN;
-import ca.uhn.hl7v2.model.v231.group.ORU_R01_ORCOBRNTEOBXNTECTI;
-import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2;
-import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI;
-import ca.uhn.hl7v2.model.v231.segment.OBR;
-import ca.uhn.hl7v2.model.v231.segment.OBX;
-import ca.uhn.hl7v2.model.v231.segment.ORC;
-import ca.uhn.hl7v2.model.v231.segment.PID;
-import ca.uhn.hl7v2.model.v231.message.ORU_R01;
-import ca.uhn.hl7v2.model.v231.segment.MSH;
+import ca.uhn.hl7v2.model.v23.datatype.CX;
+import ca.uhn.hl7v2.model.v23.datatype.HD;
+import ca.uhn.hl7v2.model.v23.datatype.XAD;
+import ca.uhn.hl7v2.model.v23.datatype.XCN;
+import ca.uhn.hl7v2.model.v23.datatype.XON;
+import ca.uhn.hl7v2.model.v23.datatype.CE;
+//import ca.uhn.hl7v2.model.v23.datatype.FN;
+import ca.uhn.hl7v2.model.v23.datatype.ST;
+import ca.uhn.hl7v2.model.v23.datatype.TS;
+import ca.uhn.hl7v2.model.v23.datatype.TSComponentOne;
+import ca.uhn.hl7v2.model.v23.datatype.XPN;
+import ca.uhn.hl7v2.model.v23.datatype.XTN;
+import ca.uhn.hl7v2.model.v23.group.ORU_R01_ORDER_OBSERVATION;
+import ca.uhn.hl7v2.model.v23.group.ORU_R01_PATIENT;
+import ca.uhn.hl7v2.model.v23.group.ORU_R01_RESPONSE;
+import ca.uhn.hl7v2.model.v23.group.ORU_R01_OBSERVATION;
+import ca.uhn.hl7v2.model.v23.segment.OBR;
+import ca.uhn.hl7v2.model.v23.segment.OBX;
+import ca.uhn.hl7v2.model.v23.segment.ORC;
+import ca.uhn.hl7v2.model.v23.segment.PID;
+import ca.uhn.hl7v2.model.v23.message.ORU_R01;
+import ca.uhn.hl7v2.model.v23.segment.MSH;
 
-public class HL7v231Parser extends BaseHL7v2Parser {
-	public HL7v231Parser() {
-		myVersion = "2.3.1";
+public class HL7v23Parser extends BaseHL7v2Parser {
+	public HL7v23Parser() {
+		myVersion = "2.3";
 	}
 
 	private JSONObject constructPatientIDfromPID34 (CX cxObject, String type) {
@@ -41,7 +42,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 
 		// Rest of Extended Composite ID are all optional. So, we get
 		// them if available.
-		ca.uhn.hl7v2.model.v231.datatype.IS pIdIdentifierTypeCode = cxObject.getIdentifierTypeCode();
+		ca.uhn.hl7v2.model.v23.datatype.IS pIdIdentifierTypeCode = cxObject.getIdentifierTypeCode();
 		if (pIdIdentifierTypeCode != null) {
 			String IdType = pIdIdentifierTypeCode.getValueOrEmpty();
 			if (IdType.isEmpty()) {
@@ -95,7 +96,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 	}
 	
 	public int map_patient(Object obj, JSONObject ecr_json) {
-		ORU_R01_PIDPD1NK1NTEPV1PV2 patient = (ORU_R01_PIDPD1NK1NTEPV1PV2) obj;
+		ORU_R01_PATIENT patient = (ORU_R01_PATIENT) obj;
 		
 		String patientName_last = "";
 		String patientName_given = "";
@@ -119,25 +120,17 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 		JSONArray patient_json_id_list = new JSONArray();
 		patient_json.put("ID", patient_json_id_list);
 		
-		int totPID3 = pid_seg.getPatientIdentifierListReps();		
+		int totPID3 = pid_seg.getPatientIDInternalIDReps();		
 		for (int j=0; j<totPID3; j++) {
-			CX pIdentifier = pid_seg.getPid3_PatientIdentifierList(j);
+			CX pIdentifier = pid_seg.getPid3_PatientIDInternalID(j);
 			patient_json_id_list.put(constructPatientIDfromPID34(pIdentifier, "PATIENT_IDENTIFIER"));
-		}
-
-		int totPID4 = pid_seg.getPid4_AlternatePatientIDPIDReps();
-		
-		for (int j=0; j<totPID4; j++) {
-			CX pAlternateID = pid_seg.getPid4_AlternatePatientIDPID(j);
-			patient_json_id_list.put(constructPatientIDfromPID34(pAlternateID, "ALTERNATIVE_PATIENT_ID"));
 		}
 
 		int totPatientNames = pid_seg.getPid5_PatientNameReps();
 		for (int j=0; j<totPatientNames; j++) {
 			XPN patientName_xpn = pid_seg.getPid5_PatientName(j);
-			FN f_name = patientName_xpn.getFamilyLastName();
-			ST f_name_st = f_name.getFamilyName();
-			ST f_name_prefix_st = f_name.getLastNamePrefix();
+			ST f_name_st = patientName_xpn.getFamilyName();
+			ST f_name_prefix_st = patientName_xpn.getPrefixEgDR();
 			
 			patientName_last = f_name_st.getValueOrEmpty();
 			String prefix = f_name_prefix_st.getValueOrEmpty();
@@ -172,7 +165,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 		patient_name.put("family", patientName_last);
 		
 		// DOB parse.
-		TS dateTimeDOB = pid_seg.getDateTimeOfBirth();
+		TS dateTimeDOB = pid_seg.getDateOfBirth();
 		try {
 			if (dateTimeDOB.isEmpty() == false) {
 				TSComponentOne timeOfAnEvent = dateTimeDOB.getTimeOfAnEvent();
@@ -192,55 +185,13 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 		String System2Use = "";
 		String Code2Use = "";
 		String Display2Use = "";
-		int totRaces = pid_seg.getRaceReps();
-		for (int j=0; j<totRaces; j++) {
-			CE raceCodedElement = pid_seg.getRace(j);
-			System = raceCodedElement.getNameOfCodingSystem().getValueOrEmpty();
-			Code = raceCodedElement.getIdentifier().getValueOrEmpty();
-			Display = raceCodedElement.getText().getValueOrEmpty();
-			
-			if (j==0) {
-				// First time. Save the parameters
-				System2Use = System;
-				Code2Use = Code;
-				Display2Use = Display;
-			}
-			
-			if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
-				// Before we move to the next race. Check if we have alternative system.
-				System = raceCodedElement.getNameOfAlternateCodingSystem().getValueOrEmpty();
-				Code = raceCodedElement.getAlternateIdentifier().getValueOrEmpty();
-				Display = raceCodedElement.getAlternateText().getValueOrEmpty();
-				if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) 
-					continue;
-			}
-			
-			if (!System.isEmpty() && !Code.isEmpty() && !Display.isEmpty()) {
-				// Done. All three parameters are available.
-				System2Use = System;
-				Code2Use = Code;
-				Display2Use = Display;
-				break;
-			}
-
-			if (!System.isEmpty() && !Code.isEmpty()) {
-				System2Use = System;
-				Code2Use = Code;
-				Display2Use = Display;					
-			} else if ((System2Use.isEmpty() || Code2Use.isEmpty()) && !Display.isEmpty()) {
-				System2Use = System;
-				Code2Use = Code;
-				Display2Use = Display;
-			}
-		}
-		
-		if (!System2Use.isEmpty() || !Code2Use.isEmpty() || !Display2Use.isEmpty()) {
+		IS race = pid_seg.getRace();
+		if ( race != null ) {
 			JSONObject patient_race = new JSONObject();
 			patient_json.put("Race", patient_race);		
 	
-			patient_race.put("System", System2Use);
-			patient_race.put("Code", Code2Use);
-			patient_race.put("Display", Display2Use);
+			patient_race.put("Code", race.getValue());
+			patient_race.put("Display", race.getValue());
 		}
 		
 		// Address
@@ -261,18 +212,16 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 		
 		// Ethnicity
 		JSONObject patient_ethnicity = new JSONObject();
-		int totEthnicity = pid_seg.getEthnicGroupReps();
-		for (int j=0; j<totEthnicity; j++) {
-			CE ethnicityCE = pid_seg.getEthnicGroup(j);
-			if (put_CE_to_json(ethnicityCE, patient_ethnicity) == 0)
-				patient_json.put("Ethnicity", patient_ethnicity);
+		IS ethnicity = pid_seg.getEthnicGroup();
+		if ( ethnicity != null ) {
+			patient_json.put("Ethnicity", patient_ethnicity);
 		}
 		
 		return 0;
 	}
 
 	public JSONObject map_order_observation(Object obj) {
-		ORU_R01_ORCOBRNTEOBXNTECTI orderObs = (ORU_R01_ORCOBRNTEOBXNTECTI) obj;
+		ORU_R01_ORDER_OBSERVATION orderObs = (ORU_R01_ORDER_OBSERVATION) obj;
 		
 		// Create a lab order JSON and put it in the lab order array.
 		JSONObject ecr_laborder_json = new JSONObject();
@@ -282,7 +231,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 		ORC common_order = orderObs.getORC();
 
 		// Get lab order information. This is a coded element.
-		CE labOrderCE = orderRequest.getUniversalServiceID();
+		CE labOrderCE = orderRequest.getObr4_UniversalServiceIdentifier();			// UniversalServiceID();
 		put_CE_to_json (labOrderCE, ecr_laborder_json);
 
 		JSONObject provider_json = new JSONObject();
@@ -314,7 +263,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 				ok_to_put = true;
 			}
 		
-			String providerFamily = orderingProviderXCN.getFamilyLastName().getFamilyName().getValueOrEmpty();
+			String providerFamily = orderingProviderXCN.getFamilyName().getValue();
 			String providerGiven = orderingProviderXCN.getGivenName().getValueOrEmpty();
 			String providerInitial = orderingProviderXCN.getMiddleInitialOrName().getValueOrEmpty();
 			String providerSuffix = orderingProviderXCN.getSuffixEgJRorIII().getValueOrEmpty();
@@ -365,7 +314,8 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 		// There may be multiple facilities. We get only one of them. 
 		ok_to_put = false;
 		JSONObject facility_json = new JSONObject();
-		int totalFacilityNames = common_order.getOrderingFacilityNameReps();
+		/*
+		int totalFacilityNames = common_order.getOrdering
 		for (int i=0; i<totalFacilityNames; i++) {
 			XON orderFacilityXON = common_order.getOrderingFacilityName(i);
 			String orgName = orderFacilityXON.getOrganizationName().getValueOrEmpty();
@@ -424,6 +374,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 			facility_json.put("Address", address);
 			break;
 		}
+		*/
 		
 		if (ok_to_put) ecr_laborder_json.put("Facility", facility_json);
 
@@ -431,24 +382,24 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 	}
 
 	public JSONObject map_lab_result(Object obj) {
-		OBX obsResult = (OBX) obj;
+		ORU_R01_OBSERVATION obsResult = (ORU_R01_OBSERVATION) obj;
 		
 		JSONObject labresult_json = new JSONObject();
 		
-		CE obsCE = obsResult.getObservationIdentifier();
+		CE obsCE = obsResult.getOBX().getObservationIdentifier();
 		put_CE_to_json(obsCE, labresult_json);
 			
 		// Add Value and Unit if appropriate.
-		String valueType = obsResult.getValueType().getValueOrEmpty();
+		String valueType = obsResult.getOBX().getValueType().getValueOrEmpty();
 		if (!valueType.isEmpty()) {
 //			if (valueType.equalsIgnoreCase("NM") 
 //					|| valueType.equalsIgnoreCase("ST")
 //					|| valueType.equalsIgnoreCase("TX")) {
-			int totalValues = obsResult.getObservationValueReps();
+			int totalValues = obsResult.getOBX().getObservationValueReps();
 			if (totalValues > 0) {
-				Varies obsValue = obsResult.getObservationValue(0);
+				Varies obsValue = obsResult.getOBX().getObservationValue(0);
 				labresult_json.put("Value", obsValue.getData());
-				CE unitCE = obsResult.getUnits();
+				CE unitCE = obsResult.getOBX().getUnits();
 				if (unitCE != null) {
 					JSONObject unit_json = new JSONObject();
 					if (put_CE_to_json(unitCE, unit_json) == 0)
@@ -459,7 +410,7 @@ public class HL7v231Parser extends BaseHL7v2Parser {
 		}
 		
 		// Put date: Not required by ECR. But, putting the date anyway...
-		TS obxDate = obsResult.getDateTimeOfTheObservation();
+		TS obxDate = obsResult.getOBX().getDateTimeOfTheObservation();
 		if (obxDate != null) {
 			labresult_json.put("Date", obxDate.getTimeOfAnEvent().getValue());
 		}

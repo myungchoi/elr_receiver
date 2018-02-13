@@ -1,9 +1,11 @@
 package edu.gatech.i3l.hl7.v2.elr_receiver;
 
+import org.apache.log4j.spi.LoggerFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import ca.uhn.hl7v2.HL7Exception;
+import ca.uhn.hl7v2.model.Structure;
 import ca.uhn.hl7v2.model.Varies;
 import ca.uhn.hl7v2.model.primitive.IS;
 import ca.uhn.hl7v2.model.v251.datatype.CE;
@@ -11,6 +13,9 @@ import ca.uhn.hl7v2.model.v251.datatype.CX;
 import ca.uhn.hl7v2.model.v251.datatype.FN;
 import ca.uhn.hl7v2.model.v251.datatype.HD;
 import ca.uhn.hl7v2.model.v251.datatype.ID;
+import ca.uhn.hl7v2.model.v251.datatype.PL;
+import ca.uhn.hl7v2.model.v251.datatype.SAD;
+import ca.uhn.hl7v2.model.v251.datatype.SI;
 import ca.uhn.hl7v2.model.v251.datatype.ST;
 import ca.uhn.hl7v2.model.v251.datatype.TS;
 import ca.uhn.hl7v2.model.v251.datatype.XAD;
@@ -20,6 +25,9 @@ import ca.uhn.hl7v2.model.v251.datatype.XPN;
 import ca.uhn.hl7v2.model.v251.datatype.XTN;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT;
+import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
+import ca.uhn.hl7v2.model.v251.group.ORU_R01_SPECIMEN;
+import ca.uhn.hl7v2.model.v251.group.ORU_R01_VISIT;
 //import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
 import ca.uhn.hl7v2.model.v251.message.ORU_R01;
 import ca.uhn.hl7v2.model.v251.segment.MSH;
@@ -27,8 +35,11 @@ import ca.uhn.hl7v2.model.v251.segment.OBR;
 import ca.uhn.hl7v2.model.v251.segment.OBX;
 import ca.uhn.hl7v2.model.v251.segment.ORC;
 import ca.uhn.hl7v2.model.v251.segment.PID;
+import ca.uhn.hl7v2.model.v251.segment.PV1;
+import ca.uhn.hl7v2.model.v251.segment.STF;
 
 public class HL7v251Parser extends BaseHL7v2Parser {
+	
 	public HL7v251Parser() {
 		myVersion = "2.5.1";
 	}
@@ -126,8 +137,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 			patient_json = new JSONObject();
 			ecr_json.put("Patient", patient_json);
 		} else
-			patient_json = ecr_json.getJSONObject("Patient");
-		
+			patient_json = ecr_json.getJSONObject("Patient");		
 		
 //		JSONObject patient_json = ecr_json.getJSONObject("Patient");
 
@@ -276,6 +286,57 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		
 		return 0;
 	}
+	
+	public JSONObject map_patient_visit(Object obj) {
+		JSONObject facility = new JSONObject();
+		
+		try {
+			ca.uhn.hl7v2.model.v251.message.ORU_R01 oru_msg = (ca.uhn.hl7v2.model.v251.message.ORU_R01)obj;
+			
+			ORU_R01_PATIENT_RESULT patient_result = oru_msg.getPATIENT_RESULT();
+			
+			ORU_R01_VISIT visit = patient_result.getPATIENT().getVISIT();
+			
+			PV1 pv1 = visit.getPV1();
+			
+			PL patientLoc_pl = pv1.getAssignedPatientLocation();
+			
+			String hospSvcName = patientLoc_pl.getBuilding().getValue();
+
+			STF stf0 = (STF)visit.get("STF");
+
+			XAD[] stf0add = stf0.getOfficeHomeAddressBirthplace();
+			
+			XAD stf0add0 = stf0add[0];
+			
+//			String hospSvcAddrDwellingNumber = stf0add0.getStreetAddress().getDwellingNumber().getValue();
+//			String hospSvcAddrStreetName = stf0add0.getStreetAddress().getStreetOrMailingAddress().getValue();
+//			String hospSvcAddrCity = stf0add0.getCity().getValue();
+//			String hospSvcAddrState = stf0add0.getStateOrProvince().getValue();
+//			String hospSvcAddrZip = stf0add0.getZipOrPostalCode().getValue();
+			
+			facility.put("Name", hospSvcName);
+//			facility.put("Address", 
+//					String.format("%s %s, %s, %s %s",
+//							hospSvcAddrDwellingNumber==null ? "" : hospSvcAddrDwellingNumber,
+//							hospSvcAddrStreetName==null ? "" : hospSvcAddrStreetName,
+//							hospSvcAddrCity==null ? "" : hospSvcAddrCity,
+//							hospSvcAddrState==null ? "" : hospSvcAddrState,
+//							hospSvcAddrZip==null ? "" : hospSvcAddrZip));
+			
+		} catch (HL7Exception e) {
+			e.printStackTrace();
+		}
+		
+		return facility;
+
+//		ORU_R01_VISIT visit = patient.getVISIT();
+//		
+//		String visitFacility = visit.getNames()[0];
+//		String visitCity = visit.
+		
+		
+	}
 
 	/*
 	 *   ORDER OBSERVATION List
@@ -348,12 +409,12 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 			}
 		}
 		
-		if (ok_to_put) ecr_laborder_json.put("Provider", provider_json);		
+//		if (ok_to_put) ecr_laborder_json.put("Provider", provider_json);		
 		
-		// Observation Time
-		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
-		if (observationTime != null && !observationTime.isEmpty())
-			ecr_laborder_json.put("DateTime", observationTime);
+//		// Observation Time
+//		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
+//		if (observationTime != null && !observationTime.isEmpty())
+//			ecr_laborder_json.put("DateTime", observationTime);
 		
 		// Reason for Study		
 		JSONArray reasons_json = new JSONArray();
@@ -402,16 +463,16 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 			String local = orderFacilityPhoneXTN.getLocalNumber().getValue();
 			
 			String phone = "";
-			if (!country.isEmpty()) phone = country;
-			if (!area.isEmpty()) phone += "-"+area;
-			if (!local.isEmpty()) phone += "-"+local;
+			if (country!=null && !country.isEmpty()) phone = country;
+			if (area!=null && !area.isEmpty()) phone += "-"+area;
+			if (local!=null && !local.isEmpty()) phone += "-"+local;
 			
-			if (!phone.isEmpty()) {
+			if (phone!=null && !phone.isEmpty()) {
 				ok_to_put = true;
 				facility_json.put("Phone", phone);
 			}
 			
-			if (!country.isEmpty() && !area.isEmpty() && !local.isEmpty()) {
+			if (country!=null && !country.isEmpty() && area!=null && !area.isEmpty() && local!=null && !local.isEmpty()) {
 				break;
 			} else {
 				String backward_phone = orderFacilityPhoneXTN.getTelephoneNumber().getValueOrEmpty();
@@ -464,8 +525,9 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 				CE unitCE = obsResult.getUnits();
 				if (unitCE != null) {
 					JSONObject unit_json = new JSONObject();
-					if (put_CE_to_json(unitCE, unit_json) == 0)
+					if (put_CE_to_json(unitCE, unit_json) == 0) {
 						labresult_json.put("Unit", unit_json);
+					}
 				}
 			}
 //			}
@@ -476,6 +538,8 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		if (obxDate != null) {
 			labresult_json.put("Date", obxDate.getTime().getValue());
 		}
+		
+		
 		
 		return labresult_json;
 	}

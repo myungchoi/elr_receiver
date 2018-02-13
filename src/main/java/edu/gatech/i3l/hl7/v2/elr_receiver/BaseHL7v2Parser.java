@@ -7,37 +7,52 @@ public abstract class BaseHL7v2Parser implements IHL7v2Parser {
 	protected String myVersion;
 	
 	protected int put_CE_to_json (Object element, JSONObject json_obj) {
-		String System;
-		String Code;
-		String Display;
+		String system, code, display;
+		String altSystem, altCode, altDisplay;
 		int ret = 0;
-		
+
+		if (myVersion.equalsIgnoreCase("2.3")) {
+			system = ((ca.uhn.hl7v2.model.v23.datatype.CE)element).getNameOfCodingSystem().getValueOrEmpty();
+			code = ((ca.uhn.hl7v2.model.v23.datatype.CE)element).getIdentifier().getValueOrEmpty();
+			display = ((ca.uhn.hl7v2.model.v23.datatype.CE)element).getText().getValueOrEmpty();
+		} else
 		if (myVersion.equalsIgnoreCase("2.3.1")) {
-			System = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getNameOfCodingSystem().getValueOrEmpty();
-			Code = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getIdentifier().getValueOrEmpty();
-			Display = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getText().getValueOrEmpty();
+			system = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getNameOfCodingSystem().getValueOrEmpty();
+			code = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getIdentifier().getValueOrEmpty();
+			display = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getText().getValueOrEmpty();
 		} else {
-			System = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getNameOfCodingSystem().getValueOrEmpty();
-			Code = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getIdentifier().getValueOrEmpty();
-			Display = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getText().getValueOrEmpty();
+			system = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getNameOfCodingSystem().getValueOrEmpty();
+			code = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getIdentifier().getValueOrEmpty();
+			display = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getText().getValueOrEmpty();
 		}
 		
-		if (System.isEmpty() && Code.isEmpty() && Display.isEmpty()) {
-			if (myVersion.equalsIgnoreCase("2.3.1")) {
-				System = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getNameOfAlternateCodingSystem().getValueOrEmpty();
-				Code = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getAlternateIdentifier().getValueOrEmpty();
-				Display = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getAlternateText().getValueOrEmpty();
-			} else {
-				System = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getNameOfAlternateCodingSystem().getValueOrEmpty();
-				Code = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getAlternateIdentifier().getValueOrEmpty();
-				Display = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getAlternateText().getValueOrEmpty();
-			}
-			ret = -1;
-		} 
+		if (myVersion.equalsIgnoreCase("2.3")) {
+			altSystem = ((ca.uhn.hl7v2.model.v23.datatype.CE)element).getNameOfAlternateCodingSystem().getValueOrEmpty();
+			altCode = ((ca.uhn.hl7v2.model.v23.datatype.CE)element).getAlternateIdentifier().getValueOrEmpty();
+			altDisplay = ((ca.uhn.hl7v2.model.v23.datatype.CE)element).getAlternateText().getValueOrEmpty();
+		} else
+		if (myVersion.equalsIgnoreCase("2.3.1")) {
+			altSystem = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getNameOfAlternateCodingSystem().getValueOrEmpty();
+			altCode = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getAlternateIdentifier().getValueOrEmpty();
+			altDisplay = ((ca.uhn.hl7v2.model.v231.datatype.CE)element).getAlternateText().getValueOrEmpty();
+		} else {
+			altSystem = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getNameOfAlternateCodingSystem().getValueOrEmpty();
+			altCode = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getAlternateIdentifier().getValueOrEmpty();
+			altDisplay = ((ca.uhn.hl7v2.model.v251.datatype.CE)element).getAlternateText().getValueOrEmpty();
+		}
 
-		json_obj.put("System", System);
-		json_obj.put("Code", Code);
-		json_obj.put("Display", Display);	
+		if (
+			(system.isEmpty() && code.isEmpty() && display.isEmpty() )
+			||
+			( ! system.equals("LN") && altSystem.equals("LN") )
+			) {
+			system = altSystem;
+			code = altCode;
+			display = altDisplay;
+		}
+		json_obj.put("System", system);
+		json_obj.put("Code", code);
+		json_obj.put("Display", display);	
 		return ret;
 	}
 
@@ -53,4 +68,7 @@ public abstract class BaseHL7v2Parser implements IHL7v2Parser {
 
 		providers_json.put(provider);
 	}
+	
+	public abstract JSONObject map_patient_visit(Object obj);
+	
 }

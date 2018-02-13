@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -15,6 +17,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.squareup.tape2.QueueFile;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
@@ -23,6 +26,8 @@ import com.sun.jersey.api.client.WebResource;
 import ca.uhn.hl7v2.DefaultHapiContext;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
+import ca.uhn.hl7v2.model.v23.group.ORU_R01_OBSERVATION;
+import ca.uhn.hl7v2.model.v23.group.ORU_R01_RESPONSE;
 import ca.uhn.hl7v2.model.v231.group.ORU_R01_ORCOBRNTEOBXNTECTI;
 import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
@@ -30,6 +35,12 @@ import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
 import ca.uhn.hl7v2.protocol.ReceivingApplication;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
 import ca.uhn.hl7v2.util.Terser;
+import gatech.edu.STIECR.JSON.CodeableConcept;
+import gatech.edu.STIECR.JSON.ECR;
+import gatech.edu.STIECR.JSON.Facility;
+import gatech.edu.STIECR.JSON.LabOrderCode;
+import gatech.edu.STIECR.JSON.LabResult;
+import gatech.edu.STIECR.JSON.Patient;
 
 /*
  * HL7v2 Message Receiver Application for ELR
@@ -98,12 +109,14 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 		
 		// Check the version = v2.5.1 or v2.3.1
 		
-		if (theMessage.getVersion().equalsIgnoreCase("2.5.1") == true) {
+		if (theMessage.getVersion().equalsIgnoreCase("2.5.1") ) {
 			myParser = (v) new HL7v251Parser();
-		} else if (theMessage.getVersion().equalsIgnoreCase("2.3.1") == true) {
+		} else if (theMessage.getVersion().equalsIgnoreCase("2.3.1") ) {
 			myParser = (v) new HL7v231Parser();
+		} else if (theMessage.getVersion().equalsIgnoreCase("2.3") ) {
+			myParser = (v) new HL7v23Parser();
 		} else {
-			LOGGER.info("Message Received, but neither v2.5.1 nor v2.3.1. Received message version is "+theMessage.getVersion());
+			LOGGER.info("Message Received, but neither v2.5.1 nor v2.3 nor v2.3.1. Received message version is "+theMessage.getVersion());
 			return false;
 		}
 		
@@ -158,8 +171,12 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 		//
 		// There can be multiple Patient Results. We send ECR per patient.
 					
+		ObjectMapper objectMapper = new ObjectMapper();
 		int newECRs = 0;
 		int totalRepPatientResult;
+		if (myParser.myVersion.equalsIgnoreCase("2.3"))
+			totalRepPatientResult = ((ca.uhn.hl7v2.model.v23.message.ORU_R01)msg).getRESPONSEReps();//PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTIReps();
+		else
 		if (myParser.myVersion.equalsIgnoreCase("2.3.1"))
 			totalRepPatientResult = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTIReps();
 		else
@@ -167,6 +184,7 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 			
 		for (int i=0; i<totalRepPatientResult; i++) {
 			// Create a new empty ECR JSON.
+			ECR ecr = new ECR();
 			JSONObject ecr_json = new JSONObject();
 			
 			// Set sending application.
@@ -177,6 +195,10 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 
 			// Patient specific information
 			Object patient;
+			if (myParser.myVersion.equalsIgnoreCase("2.3")) {
+				ORU_R01_RESPONSE patient_result = ((ca.uhn.hl7v2.model.v23.message.ORU_R01)msg).getRESPONSE(i);
+				patient = patient_result.getPATIENT();
+			} else
 			if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
 				ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI patient_result = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI(i);
 				patient = patient_result.getPIDPD1NK1NTEPV1PV2();
@@ -200,17 +222,43 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 				// we don't stop here. We are moving on.
 				patient_json = new JSONObject();
 				ecr_json.put("Patient", patient_json);
+				ecr.setPatient(new Patient());
 			} else {
 				patient_json = ecr_json.getJSONObject("Patient");
+				Patient newPatient;
+				try {
+					newPatient = objectMapper.readValue(patient_json.toString(), Patient.class);
+					ecr.setPatient(newPatient);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 			}
+			
+//			JSONObject facility = myParser.map_patient_visit(msg);
+//			
+//			ecr_json.put("Facility", facility);
+//			if ( facility.has("Name") ) {
+//				Facility newFacility = new Facility();
+//				newFacility.setname(facility.getString("Name"));
+//				newFacility.setaddress(facility.getString("Address"));
+//				ecr.setFacility(newFacility);
+//			}
 
 			// ORC/OBR Parsing
 			JSONArray laborders_json = new JSONArray();
 			
 			// This is a new JSON Array object. Put it in the patient section.
 			patient_json.put("Lab_Order_Code", laborders_json);
+			LabOrderCode newLabOrderCode = new LabOrderCode();
+			List<LabOrderCode> newLabOrderCodes = new ArrayList<LabOrderCode>();
+			newLabOrderCodes.add(newLabOrderCode);
+			ecr.getPatient().setlabOrderCode(newLabOrderCodes);
 
 			int totalOrderObs;
+			if (myParser.myVersion.equalsIgnoreCase("2.3")) {
+				ORU_R01_RESPONSE patient_result = ((ca.uhn.hl7v2.model.v23.message.ORU_R01)msg).getRESPONSE(i);
+				totalOrderObs = patient_result.getORDER_OBSERVATIONReps();
+			} else
 			if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
 				ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI patient_result = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI(i);
 				totalOrderObs = patient_result.getORCOBRNTEOBXNTECTIReps();
@@ -219,89 +267,9 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 				totalOrderObs = patient_result.getORDER_OBSERVATIONReps();
 			}
 			for (int j=0; j<totalOrderObs; j++) {
-				Object orderObs;
-				if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
-					ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI patient_result = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI(i);
-					orderObs = patient_result.getORCOBRNTEOBXNTECTI(j);
-				} else {
-					ORU_R01_PATIENT_RESULT patient_result = ((ca.uhn.hl7v2.model.v251.message.ORU_R01)msg).getPATIENT_RESULT(i);
-					orderObs = patient_result.getORDER_OBSERVATION(j);
-				}
-
-				JSONObject laborder_json = myParser.map_order_observation (orderObs);
-				if (laborder_json == null) {
-					return ErrorCode.ORDER_OBSERVATION;
-				}
-				laborders_json.put(laborder_json);
-				
-				// We add lab results to lab order.
-				JSONArray labresults_json = new JSONArray();
-				laborder_json.put("Laboratory_Results", labresults_json);
-				
-				int totalObservations;
-				if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
-					totalObservations = ((ORU_R01_ORCOBRNTEOBXNTECTI)orderObs).getOBXNTEReps();
-				} else {
-					totalObservations = ((ORU_R01_ORDER_OBSERVATION)orderObs).getOBSERVATIONReps();
-				}
-				for (int k=0; k<totalObservations; k++) {
-					Object obsResult;
-					if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
-						obsResult = ((ORU_R01_ORCOBRNTEOBXNTECTI)orderObs).getOBXNTE(k).getOBX();
-					} else {
-						obsResult = ((ORU_R01_ORDER_OBSERVATION)orderObs).getOBSERVATION(k).getOBX();						
-					}
-					JSONObject labresult_json = myParser.map_lab_result (obsResult);
-					if (labresult_json == null) {
-						return ErrorCode.LAB_RESULTS;
-					}
-					labresults_json.put(labresult_json);
-				}
-				
-				// For each order, we have provider, facility, order date and reason information.
-				// We put this information in the high level.
-				//
-				// Provider and Facility at Top ECR level.
-				// Order Date and Reason at Patient level.
-				//
-				// Provider and Facility: 
-				// We are in the Order Loop. So, we will come back. However, 
-				// ECR allows only one provider and facility. So, this can be overwritten
-				// by next order if provider info exists.
-				if (!laborder_json.isNull("Provider")) {
-					JSONObject provider_json = laborder_json.getJSONObject("Provider");
-					if (provider_json != null) 
-						myParser.add_provider (provider_json, ecr_json);
-				}				
-				
-				if (!laborder_json.isNull("Facility")) {
-					JSONObject facility_json = laborder_json.getJSONObject("Facility");
-					if (facility_json != null) ecr_json.put("Facility", facility_json);
-				}
-				
-				// Order Date and Reason. 
-				// We have Visit DateTime in ECR. We will put order date as a visit date
-				// as the order usually made when a patient visits a clinic.
-				if (!laborder_json.isNull("DateTime")) {
-					String orderDate_json = laborder_json.getString("DateTime");
-					if (orderDate_json != null) patient_json.put("Visit_DateTime", orderDate_json);
-				}
-				
-				// We have reasons in lab order. We put this in the trigger code.
-				if (!laborder_json.isNull("Reasons")) {
-					JSONArray reasons_json = laborder_json.getJSONArray("Reasons");
-					JSONArray triggercode_json;
-					if (patient_json.isNull("Tigger_Code")) {
-						triggercode_json = new JSONArray();
-						patient_json.put("Trigger_Code", triggercode_json);
-					} else {
-						triggercode_json = patient_json.getJSONArray("Trigger_Code");
-					}
-					if (reasons_json != null) {
-						for (int c=0; c<reasons_json.length(); c++) {
-							triggercode_json.put(reasons_json.get(c));
-						}
-					}
+				ErrorCode errorLab = addLabOrderFromHL7Message(msg, i, ecr_json, ecr, patient_json, laborders_json, j);
+				if ( errorLab != ErrorCode.NOERROR) {
+					return errorLab;
 				}
 			}
 			
@@ -312,6 +280,140 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 				return ErrorCode.INTERNAL;
 			}
 		}		
+		
+		return ErrorCode.NOERROR;
+	}
+
+	/**
+	 * @param msg
+	 * @param i
+	 * @param ecr_json
+	 * @param patient_json
+	 * @param laborders_json
+	 * @param j
+	 */
+	protected ErrorCode addLabOrderFromHL7Message(Message msg, int i, JSONObject ecr_json, ECR ecr, JSONObject patient_json, JSONArray laborders_json, int j) {
+		Object orderObs;
+		if (myParser.myVersion.equalsIgnoreCase("2.3")) {
+			ORU_R01_RESPONSE patient_result = ((ca.uhn.hl7v2.model.v23.message.ORU_R01)msg).getRESPONSE(i);
+			orderObs = patient_result.getORDER_OBSERVATION(j);
+		} else
+		if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
+			ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI patient_result = ((ca.uhn.hl7v2.model.v231.message.ORU_R01)msg).getPIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI(i);
+			orderObs = patient_result.getORCOBRNTEOBXNTECTI(j);
+		} else {
+			ORU_R01_PATIENT_RESULT patient_result = ((ca.uhn.hl7v2.model.v251.message.ORU_R01)msg).getPATIENT_RESULT(i);
+			orderObs = patient_result.getORDER_OBSERVATION(j);
+		}
+
+		// Parse Observation
+		JSONObject laborder_json = myParser.map_order_observation (orderObs);
+		if (laborder_json == null) {
+			return ErrorCode.ORDER_OBSERVATION;
+		}
+		laborders_json.put(laborder_json);
+		LabOrderCode labOrderCode = new LabOrderCode();
+		
+		
+		// We add lab results to lab order.
+		JSONArray labresults_json = new JSONArray();
+		laborder_json.put("Laboratory_Results", labresults_json);
+		
+		
+		int totalObservations;
+		if (myParser.myVersion.equalsIgnoreCase("2.3")) {
+			totalObservations = ((ca.uhn.hl7v2.model.v23.group.ORU_R01_ORDER_OBSERVATION)orderObs).getOBSERVATIONReps();
+		} else
+		if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
+			totalObservations = ((ORU_R01_ORCOBRNTEOBXNTECTI)orderObs).getOBXNTEReps();
+		} else {
+			totalObservations = ((ORU_R01_ORDER_OBSERVATION)orderObs).getOBSERVATIONReps();
+		}
+		
+		for (int k=0; k<totalObservations; k++) {
+			Object obsResult;
+			if (myParser.myVersion.equalsIgnoreCase("2.3")) {
+				obsResult = ((ca.uhn.hl7v2.model.v23.group.ORU_R01_ORDER_OBSERVATION)orderObs).getOBSERVATION(k);
+			} else
+			if (myParser.myVersion.equalsIgnoreCase("2.3.1")) {
+				obsResult = ((ORU_R01_ORCOBRNTEOBXNTECTI)orderObs).getOBXNTE(k).getOBX();
+			} else {
+				obsResult = ((ORU_R01_ORDER_OBSERVATION)orderObs).getOBSERVATION(k).getOBX();						
+			}
+			JSONObject labresult_json = myParser.map_lab_result (obsResult);
+			if (labresult_json == null) {
+				return ErrorCode.LAB_RESULTS;
+			}
+			labresults_json.put(labresult_json);
+			
+			LabResult labResult = new LabResult();
+			labResult.setcode(labresult_json.getString("Code"));
+			labResult.setdisplay(labresult_json.getString("Display"));
+			labResult.setsystem(labresult_json.getString("System"));
+			labResult.setDate(labresult_json.getString("Date"));
+			if ( labresult_json.has("Value") ) {
+				Object labResultValue = labresult_json.get("Value");
+				labResult.setValue(labResultValue.toString());
+				if ( labresult_json.has("Unit") ) {
+					JSONObject unit = labresult_json.getJSONObject("Unit");
+					if ( unit != null ) {
+						String unit_system = unit.getString("System");
+						String unit_display = unit.getString("Display");
+						String unit_code = unit.getString("Code");
+					
+						CodeableConcept concept = new CodeableConcept(unit_system, unit_display, unit_code);
+						labResult.setUnit(concept);
+					}
+				}
+			}
+			labOrderCode.getLaboratory_Results().add(labResult);
+		}
+		
+		// For each order, we have provider, facility, order date and reason information.
+		// We put this information in the high level.
+		//
+		// Provider and Facility at Top ECR level.
+		// Order Date and Reason at Patient level.
+		//
+		// Provider and Facility: 
+		// We are in the Order Loop. So, we will come back. However, 
+		// ECR allows only one provider and facility. So, this can be overwritten
+		// by next order if provider info exists.
+		if (!laborder_json.isNull("Provider")) {
+			JSONObject provider_json = laborder_json.getJSONObject("Provider");
+			if (provider_json != null) 
+				myParser.add_provider (provider_json, ecr_json);
+		}				
+		
+		if (!laborder_json.isNull("Facility")) {
+			JSONObject facility_json = laborder_json.getJSONObject("Facility");
+			if (facility_json != null) ecr_json.put("Facility", facility_json);
+		}
+		
+		// Order Date and Reason. 
+		// We have Visit DateTime in ECR. We will put order date as a visit date
+		// as the order usually made when a patient visits a clinic.
+		if (!laborder_json.isNull("Date")) {
+			String orderDate_json = laborder_json.getString("Date");
+			if (orderDate_json != null) patient_json.put("Visit_DateTime", orderDate_json);
+		}
+		
+		// We have reasons in lab order. We put this in the trigger code.
+		if (!laborder_json.isNull("Reasons")) {
+			JSONArray reasons_json = laborder_json.getJSONArray("Reasons");
+			JSONArray triggercode_json;
+			if (patient_json.isNull("Tigger_Code")) {
+				triggercode_json = new JSONArray();
+				patient_json.put("Trigger_Code", triggercode_json);
+			} else {
+				triggercode_json = patient_json.getJSONArray("Trigger_Code");
+			}
+			if (reasons_json != null) {
+				for (int c=0; c<reasons_json.length(); c++) {
+					triggercode_json.put(reasons_json.get(c));
+				}
+			}
+		}
 		
 		return ErrorCode.NOERROR;
 	}
@@ -347,7 +449,7 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 		return ret;
 	}
 	
-	private void send_ecr(JSONObject ecrJson) 
+	void send_ecr(JSONObject ecrJson) 
 		throws Exception {
 
 //		System.out.println("ECR Report submitted:"+ecrJson.toString());
