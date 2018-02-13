@@ -454,7 +454,9 @@ public class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements Rece
 
 //		System.out.println("ECR Report submitted:"+ecrJson.toString());
 //		return;
+		
 //Todo: Deal with this later. Just add ID for now.
+		
 		Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 		Long id_num = (Long) (timestamp.getTime()/10000);
 		ecrJson.put("id", id_num.toString());
