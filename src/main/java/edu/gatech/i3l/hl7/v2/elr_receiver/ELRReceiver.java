@@ -132,8 +132,9 @@ public class ELRReceiver
 
 		public String processException(String theIncomingMessage, Map<String, Object> theIncomingMetadata, String theOutgoingMessage, Exception theE)
 				throws HL7Exception {
-			System.out.println("processException(incoming):\n" + theIncomingMessage +"\n\n");
-			System.out.println("processException(outgoing):\n" + theOutgoingMessage +"\n\n");
+			LOGGER.error("processException(incoming):\n" + theIncomingMessage +"\n\n");
+			LOGGER.error("processException(outgoing):\n" + theOutgoingMessage +"\n\n");
+			LOGGER.error("Exception:", theE);
 			return theOutgoingMessage;
 		}
 		

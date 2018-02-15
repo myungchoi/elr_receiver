@@ -30,7 +30,7 @@ public class TestHL7v2ReceiverApplication extends TestCase {
 		Parser p = context.getPipeParser();
 		context.setModelClassFactory(new CanonicalModelClassFactory("2.5.1"));
 		
-		String msgStr = new String(Files.readAllBytes(new File("p:/FHIR_ECR_DATA/DATA_FROM_LOINC_ENHANCED_2017_1201_1208/ecr_positive_ln_1emsg.txt").toPath()));
+		String msgStr = new String(Files.readAllBytes(new File("C:/test_hl7_file.txt").toPath()));
 		msgStr = msgStr.replaceAll("\n", "\r");
 		Message hl7Msg = p.parse(msgStr);
 		

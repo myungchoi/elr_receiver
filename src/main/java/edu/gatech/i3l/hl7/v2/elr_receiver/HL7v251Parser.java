@@ -469,42 +469,48 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		// There may be multiple phone numbers. We get only one.
 		int totalFacilityPhones = common_order.getOrderingFacilityPhoneNumberReps();
 		for (int i=0; i<totalFacilityPhones; i++) {
-			XTN orderFacilityPhoneXTN = common_order.getOrderingFacilityPhoneNumber(i);
-			
-			// See if we have full phone number.
-			ST phoneNumberST = orderFacilityPhoneXTN.getTelephoneNumber();
-			if (phoneNumberST != null) {
-				String phoneNumber = phoneNumberST.getValue();
-				if (phoneNumber != null & !phoneNumber.isEmpty()) {
-					ok_to_put = true;
-					facility_json.put("Phone", phoneNumber);
-					break;
+			try {
+				XTN orderFacilityPhoneXTN = common_order.getOrderingFacilityPhoneNumber(i);
+				
+				// See if we have full phone number.
+				if ( orderFacilityPhoneXTN != null ) {
+					ST phoneNumberST = orderFacilityPhoneXTN.getTelephoneNumber();
+					if (phoneNumberST != null) {
+						String phoneNumber = phoneNumberST.getValue();
+						if (phoneNumber != null && !phoneNumber.isEmpty()) {
+							ok_to_put = true;
+							facility_json.put("Phone", phoneNumber);
+							break;
+						}
+					}
 				}
-			}
-			
-			String country = orderFacilityPhoneXTN.getCountryCode().getValue();
-			String area = orderFacilityPhoneXTN.getAreaCityCode().getValue();
-			String local = orderFacilityPhoneXTN.getLocalNumber().getValue();
-			
-			String phone = "";
-			if (country!=null && !country.isEmpty()) phone = country;
-			if (area!=null && !area.isEmpty()) phone += "-"+area;
-			if (local!=null && !local.isEmpty()) phone += "-"+local;
-			
-			if (phone!=null && !phone.isEmpty()) {
-				ok_to_put = true;
-				facility_json.put("Phone", phone);
-			}
-			
-			if (country!=null && !country.isEmpty() && area!=null && !area.isEmpty() && local!=null && !local.isEmpty()) {
-				break;
-			} else {
-				String backward_phone = orderFacilityPhoneXTN.getTelephoneNumber().getValueOrEmpty();
-				if (!backward_phone.isEmpty()) {
+				
+				String country = orderFacilityPhoneXTN.getCountryCode().getValue();
+				String area = orderFacilityPhoneXTN.getAreaCityCode().getValue();
+				String local = orderFacilityPhoneXTN.getLocalNumber().getValue();
+				
+				String phone = "";
+				if (country!=null && !country.isEmpty()) phone = country;
+				if (area!=null && !area.isEmpty()) phone += "-"+area;
+				if (local!=null && !local.isEmpty()) phone += "-"+local;
+				
+				if (phone!=null && !phone.isEmpty()) {
 					ok_to_put = true;
-					facility_json.put("Phone", backward_phone);
-					break;
+					facility_json.put("Phone", phone);
 				}
+				
+				if (country!=null && !country.isEmpty() && area!=null && !area.isEmpty() && local!=null && !local.isEmpty()) {
+					break;
+				} else {
+					String backward_phone = orderFacilityPhoneXTN.getTelephoneNumber().getValueOrEmpty();
+					if (!backward_phone.isEmpty()) {
+						ok_to_put = true;
+						facility_json.put("Phone", backward_phone);
+						break;
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
 		
