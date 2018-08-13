@@ -37,9 +37,11 @@ public class ELRReceiver
 
 	static String default_port = "8888";
 	static String default_phcr_controller_api_url = "http://localhost:8888/ECR";
+	static String default_fhir_controller_api_url = "http://localhost:8080/fhir";
+	static String default_receiver_parser_mode = "FHIR";
 	static boolean default_useTls = false;
 	static String default_useTls_str = "False";
-	static String default_qFileName = "queueECR";
+	static String default_qFileName = "queueELR";
 	static String default_ecrTemplateFileName = "ECR.json";
 	
 	public static void main( String[] args ) throws Exception
@@ -50,6 +52,8 @@ public class ELRReceiver
 		Integer port = Integer.parseInt(default_port);
 		boolean useTls = default_useTls;
 		String phcr_controller_api_url = default_phcr_controller_api_url;
+		String fhir_controller_api_url = default_fhir_controller_api_url;
+		String parser_mode = default_receiver_parser_mode;
 		String qFileName = default_qFileName;
 		String ecrTemplateFileName = default_ecrTemplateFileName;
 		
@@ -60,6 +64,8 @@ public class ELRReceiver
 			
 			port = Integer.parseInt(prop.getProperty("port", default_port));
 			phcr_controller_api_url = prop.getProperty("phcrControllerUrl", default_phcr_controller_api_url);
+			fhir_controller_api_url = prop.getProperty("fhirControllerUrl", default_fhir_controller_api_url);
+			parser_mode = prop.getProperty("HL7ParserMode", default_receiver_parser_mode);
 			qFileName = prop.getProperty("qFileName", default_qFileName);
 			ecrTemplateFileName = prop.getProperty("ecrFileName", default_ecrTemplateFileName);
 			
@@ -76,6 +82,8 @@ public class ELRReceiver
 				output = new FileOutputStream("config.properties");
 				prop.setProperty("port", default_port);
 				prop.setProperty("phcrControllerUrl", default_phcr_controller_api_url);
+				prop.setProperty("fhirControllerUrl", default_fhir_controller_api_url);
+				prop.setProperty("HL7ParserMode", default_receiver_parser_mode);
 				prop.setProperty("useTls", default_useTls_str);
 				prop.setProperty("qFileName", default_qFileName);
 				prop.setProperty("ecrFileName", default_ecrTemplateFileName);
@@ -86,13 +94,19 @@ public class ELRReceiver
 		HapiContext ctx = new DefaultHapiContext();
 		HL7Service server = ctx.newServer(port, useTls);
 		
-		HL7v2ReceiverApplication handler = new HL7v2ReceiverApplication();		
-		server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
+		if (parser_mode.equals("FHIR")) {
+			HL7v2ReceiverFHIRApplication handler = new HL7v2ReceiverFHIRApplication();
+			server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
+			// Configure the Receiver App before we start.
+			handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName);
+		} else {
+			HL7v2ReceiverApplication handler = new HL7v2ReceiverApplication();
+			server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
+			// Configure the Receiver App before we start.
+			handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName);
+		}
 		server.registerConnectionListener(new MyConnectionListener());
 		server.setExceptionHandler(new MyExceptionHandler());
-
-		// Configure the Receiver App before we start.
-		handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName);
 
 		server.startAndWait();
 	}

@@ -1,10 +1,11 @@
-package edu.gatech.i3l.hl7.v2.elr_receiver;
+package edu.gatech.i3l.hl7.v2.parser.ecr;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-public abstract class BaseHL7v2Parser implements IHL7v2Parser {
-	protected String myVersion;
+import edu.gatech.i3l.hl7.v2.parser.BaseHL7v2Parser;
+
+public abstract class BaseHL7v2ECRParser extends BaseHL7v2Parser implements IHL7v2ECRParser {
 	
 	protected int put_CE_to_json (Object element, JSONObject json_obj) {
 		String System;
@@ -41,7 +42,7 @@ public abstract class BaseHL7v2Parser implements IHL7v2Parser {
 		return ret;
 	}
 
-	protected void add_provider(JSONObject provider, JSONObject ecr_json) {
+	public void add_provider(JSONObject provider, JSONObject ecr_json) {
 		JSONArray providers_json;
 		
 		if (ecr_json.isNull("Provider")) {

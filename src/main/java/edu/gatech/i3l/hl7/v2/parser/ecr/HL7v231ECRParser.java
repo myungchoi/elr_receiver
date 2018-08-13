@@ -1,4 +1,4 @@
-package edu.gatech.i3l.hl7.v2.elr_receiver;
+package edu.gatech.i3l.hl7.v2.parser.ecr;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -6,42 +6,43 @@ import org.json.JSONObject;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Varies;
 import ca.uhn.hl7v2.model.primitive.IS;
-import ca.uhn.hl7v2.model.v251.datatype.CE;
-import ca.uhn.hl7v2.model.v251.datatype.CX;
-import ca.uhn.hl7v2.model.v251.datatype.FN;
-import ca.uhn.hl7v2.model.v251.datatype.HD;
-import ca.uhn.hl7v2.model.v251.datatype.ID;
-import ca.uhn.hl7v2.model.v251.datatype.ST;
-import ca.uhn.hl7v2.model.v251.datatype.TS;
-import ca.uhn.hl7v2.model.v251.datatype.XAD;
-import ca.uhn.hl7v2.model.v251.datatype.XCN;
-import ca.uhn.hl7v2.model.v251.datatype.XON;
-import ca.uhn.hl7v2.model.v251.datatype.XPN;
-import ca.uhn.hl7v2.model.v251.datatype.XTN;
-import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
-import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT;
-//import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
-import ca.uhn.hl7v2.model.v251.message.ORU_R01;
-import ca.uhn.hl7v2.model.v251.segment.MSH;
-import ca.uhn.hl7v2.model.v251.segment.OBR;
-import ca.uhn.hl7v2.model.v251.segment.OBX;
-import ca.uhn.hl7v2.model.v251.segment.ORC;
-import ca.uhn.hl7v2.model.v251.segment.PID;
+import ca.uhn.hl7v2.model.v231.datatype.CX;
+import ca.uhn.hl7v2.model.v231.datatype.HD;
+import ca.uhn.hl7v2.model.v231.datatype.XAD;
+import ca.uhn.hl7v2.model.v231.datatype.XCN;
+import ca.uhn.hl7v2.model.v231.datatype.XON;
+import ca.uhn.hl7v2.model.v231.datatype.CE;
+import ca.uhn.hl7v2.model.v231.datatype.FN;
+import ca.uhn.hl7v2.model.v231.datatype.ST;
+import ca.uhn.hl7v2.model.v231.datatype.TN;
+import ca.uhn.hl7v2.model.v231.datatype.TS;
+import ca.uhn.hl7v2.model.v231.datatype.TSComponentOne;
+import ca.uhn.hl7v2.model.v231.datatype.XPN;
+import ca.uhn.hl7v2.model.v231.datatype.XTN;
+import ca.uhn.hl7v2.model.v231.group.ORU_R01_ORCOBRNTEOBXNTECTI;
+import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2;
+import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI;
+import ca.uhn.hl7v2.model.v231.segment.OBR;
+import ca.uhn.hl7v2.model.v231.segment.OBX;
+import ca.uhn.hl7v2.model.v231.segment.ORC;
+import ca.uhn.hl7v2.model.v231.segment.PID;
+import ca.uhn.hl7v2.model.v231.message.ORU_R01;
+import ca.uhn.hl7v2.model.v231.segment.MSH;
 
-public class HL7v251Parser extends BaseHL7v2Parser {
-	public HL7v251Parser() {
-		myVersion = "2.5.1";
+public class HL7v231ECRParser extends BaseHL7v2ECRParser {
+	public HL7v231ECRParser() {
+		setMyVersion("2.3.1");
 	}
 
 	private JSONObject constructPatientIDfromPID34 (CX cxObject, String type) {
 		JSONObject patient_json_id = new JSONObject();
 
-		String patientID = cxObject.getIDNumber().getValue();
+		String patientID = cxObject.getID().getValue();
 		patient_json_id.put("value", patientID);
 
 		// Rest of Extended Composite ID are all optional. So, we get
 		// them if available.
-		ID pIdIdentifierTypeCode = cxObject.getIdentifierTypeCode();
+		ca.uhn.hl7v2.model.v231.datatype.IS pIdIdentifierTypeCode = cxObject.getIdentifierTypeCode();
 		if (pIdIdentifierTypeCode != null) {
 			String IdType = pIdIdentifierTypeCode.getValueOrEmpty();
 			if (IdType.isEmpty()) {
@@ -50,11 +51,10 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 				patient_json_id.put("type", IdType);
 			}
 		}
-
 //		HD pIdAssignAuth = cxObject.getAssigningAuthority();
 //		if (pIdAssignAuth != null) {
 //			String AssignAuthName = pIdAssignAuth.getNamespaceID().getValueOrEmpty();
-//
+//			
 //			// Patient ID Number and Assigning Authority Name Space (user defined)
 //			// will probably sufficient to check.
 //			if (!AssignAuthName.isEmpty()) {
@@ -73,7 +73,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 	private String make_single_address (XAD addressXAD) {
 		String ret = "";
 		
-		String address = addressXAD.getStreetAddress().getStreetOrMailingAddress().getValueOrEmpty();
+		String address = addressXAD.getStreetAddress().getValueOrEmpty();
 		String city = addressXAD.getCity().getValueOrEmpty();
 		String state = addressXAD.getStateOrProvince().getValueOrEmpty();
 		String zip = addressXAD.getZipOrPostalCode().getValueOrEmpty();
@@ -95,25 +95,8 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		return ret;
 	}
 	
-	/*
-	 * We selects the patient ID that has assigned auth
-	 * name as "EMR". If this does not exist, then we choose the last patient ID from the list.
-	 * 
-	 * Patient Name is selected from the same section. If multiple names exist, we choose
-	 * the first one.
-	 * 
-	 * Patient ID: PID-3-1. This is required field. If this is not available, it returns -1
-	 * Patient Name: PID-5. This is required field. If this is not available, it returns -1
-	 * Date of Birth: PID-7. 
-	 * Administrative Sex: PID-8
-	 * Race: PID-10
-	 * Address: PID-11
-	 * Preferred Language: PID-15
-	 * Ethnicity: PID-22
-	 * 
-	 */
 	public int map_patient(Object obj, JSONObject ecr_json) {
-		ORU_R01_PATIENT patient = (ORU_R01_PATIENT) obj;
+		ORU_R01_PIDPD1NK1NTEPV1PV2 patient = (ORU_R01_PIDPD1NK1NTEPV1PV2) obj;
 		
 		String patientName_last = "";
 		String patientName_given = "";
@@ -137,7 +120,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		JSONArray patient_json_id_list = new JSONArray();
 		patient_json.put("ID", patient_json_id_list);
 		
-		int totPID3 = pid_seg.getPid3_PatientIdentifierListReps();		
+		int totPID3 = pid_seg.getPatientIdentifierListReps();		
 		for (int j=0; j<totPID3; j++) {
 			CX pIdentifier = pid_seg.getPid3_PatientIdentifierList(j);
 			patient_json_id_list.put(constructPatientIDfromPID34(pIdentifier, "PATIENT_IDENTIFIER"));
@@ -153,9 +136,15 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		int totPatientNames = pid_seg.getPid5_PatientNameReps();
 		for (int j=0; j<totPatientNames; j++) {
 			XPN patientName_xpn = pid_seg.getPid5_PatientName(j);
-			FN f_name = patientName_xpn.getFamilyName();
-			ST f_name_st = f_name.getFn1_Surname();
+			FN f_name = patientName_xpn.getFamilyLastName();
+			ST f_name_st = f_name.getFamilyName();
+			ST f_name_prefix_st = f_name.getLastNamePrefix();
+			
 			patientName_last = f_name_st.getValueOrEmpty();
+			String prefix = f_name_prefix_st.getValueOrEmpty();
+			if (!prefix.isEmpty())
+				patientName_last = prefix+" "+patientName_last;
+			
 			ST m_name = patientName_xpn.getGivenName();
 			patientName_given = m_name.getValueOrEmpty();
 			
@@ -163,7 +152,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 				continue;
 			}
 			
-			ST f_name_initial = patientName_xpn.getSecondAndFurtherGivenNamesOrInitialsThereof();
+			ST f_name_initial = patientName_xpn.getMiddleInitialOrName();
 			patientName_middle = f_name_initial.getValueOrEmpty();
 		}
 					
@@ -187,20 +176,20 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		TS dateTimeDOB = pid_seg.getDateTimeOfBirth();
 		try {
 			if (dateTimeDOB.isEmpty() == false) {
-				patient_json.put("Birth_Date", dateTimeDOB.getTime().getValue());
+				TSComponentOne timeOfAnEvent = dateTimeDOB.getTimeOfAnEvent();
+				String DOB_str = timeOfAnEvent.getValue();
+				if (DOB_str != null && !DOB_str.isEmpty())
+					patient_json.put("Birth_Date", DOB_str);
 			}
 		} catch (HL7Exception e) {
 			e.printStackTrace();
 		}
 		
 		// Administrative Sex
-		IS gender = pid_seg.getAdministrativeSex();
+		IS gender = pid_seg.getSex();
 		patient_json.put("Sex", gender.getValueOrEmpty());
 
 		// Race
-		JSONObject patient_race = new JSONObject();
-		patient_json.put("Race", patient_race);
-		
 		String System2Use = "";
 		String Code2Use = "";
 		String Display2Use = "";
@@ -245,10 +234,16 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 				Display2Use = Display;
 			}
 		}
-		patient_race.put("System", System2Use);
-		patient_race.put("Code", Code2Use);
-		patient_race.put("Display", Display2Use);
-
+		
+		if (!System2Use.isEmpty() || !Code2Use.isEmpty() || !Display2Use.isEmpty()) {
+			JSONObject patient_race = new JSONObject();
+			patient_json.put("Race", patient_race);		
+	
+			patient_race.put("System", System2Use);
+			patient_race.put("Code", Code2Use);
+			patient_race.put("Display", Display2Use);
+		}
+		
 		// Address
 		int totAddresses = pid_seg.getPatientAddressReps();
 		for (int j=0; j<totAddresses; j++) {
@@ -277,12 +272,8 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		return 0;
 	}
 
-	/*
-	 *   ORDER OBSERVATION List
-	 *   OBR-16. Use ORC-12 if OBR-16 is empty.
-	 */
 	public JSONObject map_order_observation(Object obj) {
-		ORU_R01_ORDER_OBSERVATION orderObs = (ORU_R01_ORDER_OBSERVATION) obj;
+		ORU_R01_ORCOBRNTEOBXNTECTI orderObs = (ORU_R01_ORCOBRNTEOBXNTECTI) obj;
 		
 		// Create a lab order JSON and put it in the lab order array.
 		JSONObject ecr_laborder_json = new JSONObject();
@@ -292,7 +283,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		ORC common_order = orderObs.getORC();
 
 		// Get lab order information. This is a coded element.
-		CE labOrderCE = orderRequest.getUniversalServiceIdentifier();
+		CE labOrderCE = orderRequest.getUniversalServiceID();
 		put_CE_to_json (labOrderCE, ecr_laborder_json);
 
 		JSONObject provider_json = new JSONObject();
@@ -324,9 +315,9 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 				ok_to_put = true;
 			}
 		
-			String providerFamily = orderingProviderXCN.getFamilyName().getFn1_Surname().getValueOrEmpty();
+			String providerFamily = orderingProviderXCN.getFamilyLastName().getFamilyName().getValueOrEmpty();
 			String providerGiven = orderingProviderXCN.getGivenName().getValueOrEmpty();
-			String providerInitial = orderingProviderXCN.getSecondAndFurtherGivenNamesOrInitialsThereof().getValueOrEmpty();
+			String providerInitial = orderingProviderXCN.getMiddleInitialOrName().getValueOrEmpty();
 			String providerSuffix = orderingProviderXCN.getSuffixEgJRorIII().getValueOrEmpty();
 			String providerPrefix = orderingProviderXCN.getPrefixEgDR().getValueOrEmpty();
 			
@@ -363,7 +354,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		if (ok_to_put) ecr_laborder_json.put("Provider", provider_json);		
 		
 		// Observation Time
-		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
+		String observationTime = orderRequest.getObservationDateTime().getTimeOfAnEvent().getValue();
 		if (observationTime != null && !observationTime.isEmpty())
 			ecr_laborder_json.put("DateTime", observationTime);
 		
@@ -411,7 +402,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 			XTN orderFacilityPhoneXTN = common_order.getOrderingFacilityPhoneNumber(i);
 			
 			// See if we have full phone number.
-			ST phoneNumberST = orderFacilityPhoneXTN.getTelephoneNumber();
+			TN phoneNumberST = orderFacilityPhoneXTN.getXtn1_9999999X99999CAnyText();
 			if (phoneNumberST != null) {
 				String phoneNumber = phoneNumberST.getValue();
 				if (phoneNumber != null & !phoneNumber.isEmpty()) {
@@ -420,10 +411,10 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 					break;
 				}
 			}
-			
+
 			String country = orderFacilityPhoneXTN.getCountryCode().getValue();
 			String area = orderFacilityPhoneXTN.getAreaCityCode().getValue();
-			String local = orderFacilityPhoneXTN.getLocalNumber().getValue();
+			String local = orderFacilityPhoneXTN.getPhoneNumber().getValue();
 			
 			String phone = "";
 			if (!country.isEmpty()) phone = country;
@@ -438,7 +429,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 			if (!country.isEmpty() && !area.isEmpty() && !local.isEmpty()) {
 				break;
 			} else {
-				String backward_phone = orderFacilityPhoneXTN.getTelephoneNumber().getValueOrEmpty();
+				String backward_phone = orderFacilityPhoneXTN.getXtn1_9999999X99999CAnyText().getValue();
 				if (!backward_phone.isEmpty()) {
 					ok_to_put = true;
 					facility_json.put("Phone", backward_phone);
@@ -464,9 +455,6 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		return ecr_laborder_json;
 	}
 
-	/*
-	 * Lab Results (OBXes)
-	 */
 	public JSONObject map_lab_result(Object obj) {
 		OBX obsResult = (OBX) obj;
 		
@@ -498,7 +486,7 @@ public class HL7v251Parser extends BaseHL7v2Parser {
 		// Put date: Not required by ECR. But, putting the date anyway...
 		TS obxDate = obsResult.getDateTimeOfTheObservation();
 		if (obxDate != null) {
-			labresult_json.put("Date", obxDate.getTime().getValue());
+			labresult_json.put("Date", obxDate.getTimeOfAnEvent().getValue());
 		}
 		
 		return labresult_json;

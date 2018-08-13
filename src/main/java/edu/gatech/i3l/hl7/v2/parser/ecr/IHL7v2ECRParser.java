@@ -1,8 +1,8 @@
-package edu.gatech.i3l.hl7.v2.elr_receiver;
+package edu.gatech.i3l.hl7.v2.parser.ecr;
 
 import org.json.JSONObject;
 
-public interface IHL7v2Parser {
+public interface IHL7v2ECRParser {
 	// Object should be ORU_R01_PATIENT or equivalent section to 
 	// get patient information. 
 	// Return 0 for success.
