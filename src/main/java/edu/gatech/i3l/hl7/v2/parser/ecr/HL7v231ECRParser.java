@@ -354,9 +354,9 @@ public class HL7v231ECRParser extends BaseHL7v2ECRParser {
 		if (ok_to_put) ecr_laborder_json.put("Provider", provider_json);		
 		
 		// Observation Time
-		String observationTime = orderRequest.getObservationDateTime().getTimeOfAnEvent().getValue();
-		if (observationTime != null && !observationTime.isEmpty())
-			ecr_laborder_json.put("DateTime", observationTime);
+//		String observationTime = orderRequest.getObservationDateTime().getTimeOfAnEvent().getValue();
+//		if (observationTime != null && !observationTime.isEmpty())
+//			ecr_laborder_json.put("DateTime", observationTime);
 		
 		// Reason for Study		
 		JSONArray reasons_json = new JSONArray();
@@ -540,5 +540,10 @@ public class HL7v231ECRParser extends BaseHL7v2ECRParser {
 
 		return 0;
 	}
-
+	
+	@Override
+	public JSONObject map_patient_visit(Object obj) {
+		JSONObject patient_visit_json = new JSONObject(); 
+		return patient_visit_json;
+	}	
 }

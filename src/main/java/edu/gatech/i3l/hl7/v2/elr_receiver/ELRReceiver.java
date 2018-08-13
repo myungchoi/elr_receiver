@@ -100,7 +100,7 @@ public class ELRReceiver
 			// Configure the Receiver App before we start.
 			handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName);
 		} else {
-			HL7v2ReceiverApplication handler = new HL7v2ReceiverApplication();
+			HL7v2ReceiverECRApplication handler = new HL7v2ReceiverECRApplication();
 			server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
 			// Configure the Receiver App before we start.
 			handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName);
@@ -146,8 +146,9 @@ public class ELRReceiver
 
 		public String processException(String theIncomingMessage, Map<String, Object> theIncomingMetadata, String theOutgoingMessage, Exception theE)
 				throws HL7Exception {
-			System.out.println("processException(incoming):\n" + theIncomingMessage +"\n\n");
-			System.out.println("processException(outgoing):\n" + theOutgoingMessage +"\n\n");
+			LOGGER.error("processException(incoming):\n" + theIncomingMessage +"\n\n");
+			LOGGER.error("processException(outgoing):\n" + theOutgoingMessage +"\n\n");
+			LOGGER.error("Exception:", theE);
 			return theOutgoingMessage;
 		}
 		

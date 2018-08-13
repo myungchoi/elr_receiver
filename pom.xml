@@ -13,6 +13,8 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.compiler.source>1.7</maven.compiler.source>
+    	<maven.compiler.target>1.7</maven.compiler.target>		
 	</properties>
 	<repositories>
 		<!-- Added to get the Atmosphere 1.1.0-SNAPSHOT, can be removed when 1.1.0 
@@ -29,6 +31,16 @@
 		</repository>
 	</repositories>
 	<dependencies>
+	
+<!-- uncomment when we get repo server for this jar 	
+	  	<dependency>
+	  	  <groupId>gatech.edu</groupId>
+	  	  <artifactId>STIECR</artifactId>
+	  	  <version>0.0.1-SNAPSHOT</version>
+	  	</dependency>
+	  	
+ -->	  	
+	  	
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>

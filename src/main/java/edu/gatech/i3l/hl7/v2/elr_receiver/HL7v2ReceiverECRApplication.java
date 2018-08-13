@@ -242,7 +242,7 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 			}
 			
 			try {
-				send_ecr (ecr_json);
+				sendEcr (ecr_json);
 			} catch (Exception e) {
 				e.printStackTrace();
 				return ErrorCode.INTERNAL;
@@ -252,7 +252,7 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 		return ErrorCode.NOERROR;
 	}
 	
-	private void send_ecr(JSONObject ecrJson) 
+	private void sendEcr(JSONObject ecrJson) 
 		throws Exception {
 
 //		System.out.println("ECR Report submitted:"+ecrJson.toString());
@@ -278,5 +278,14 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 			LOGGER.info("ECR Report submitted:"+ecrJson.toString());
 			System.out.println("ECR Report submitted:"+ecrJson.toString());
 		}
+	}
+
+	public void sendData(JSONObject jsonData) {
+		try {
+			sendEcr(jsonData);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
 	}
 }

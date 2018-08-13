@@ -155,4 +155,13 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 //			System.out.println("FHIR Message submitted:"+fhirJsonObject.toString());
 //		}
 	}
+
+	public void sendData(JSONObject jsonData) {
+		try {
+			sendFhir(jsonData);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 }
