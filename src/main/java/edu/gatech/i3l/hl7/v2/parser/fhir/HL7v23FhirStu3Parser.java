@@ -1,6 +1,5 @@
 package edu.gatech.i3l.hl7.v2.parser.fhir;
 
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -13,7 +12,6 @@ import org.hl7.fhir.dstu3.model.Coding;
 import org.hl7.fhir.dstu3.model.DateTimeType;
 import org.hl7.fhir.dstu3.model.Enumerations.AdministrativeGender;
 import org.hl7.fhir.dstu3.model.Enumerations.MessageEvent;
-import org.hl7.fhir.dstu3.model.Enumerations.MessageEventEnumFactory;
 import org.hl7.fhir.dstu3.model.HumanName;
 import org.hl7.fhir.dstu3.model.IdType;
 import org.hl7.fhir.dstu3.model.Identifier;
@@ -27,6 +25,8 @@ import org.hl7.fhir.dstu3.model.Quantity;
 import org.hl7.fhir.dstu3.model.Reference;
 import org.hl7.fhir.dstu3.model.StringType;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.dstu3.model.Bundle.BundleEntryRequestComponent;
+import org.hl7.fhir.dstu3.model.Bundle.HTTPVerb;
 
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
@@ -89,10 +89,20 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			List<Patient> returnedPatients = mapPatients(oruR01Message.getRESPONSE(i));
 			// v2.3 says that there should be 1 patient. This library reads as many.
 			// We just use first one if the returnedPatients is not empty.
+			String patientReference = null;
 			if (returnedPatients.size() > 0) {
 				BundleEntryComponent bundleEntryPatient = new BundleEntryComponent();
 				subject = returnedPatients.get(0);
 				bundleEntryPatient.setResource(subject);
+				//TODO: revisit this if we found a case where we can put request in bundle.
+				// for now, FHIR spec does not indicate message to have request or response.
+//				BundleEntryRequestComponent bundleEntryRequest = new BundleEntryRequestComponent();
+//				bundleEntryRequest.setMethod(HTTPVerb.POST);
+//				bundleEntryRequest.setUrl("Patient");
+//				bundleEntryPatient.setRequest(bundleEntryRequest);
+				UUID uuid = UUID.randomUUID();
+				patientReference = "urn:uuid:"+uuid.toString();
+				bundleEntryPatient.setFullUrl(patientReference);
 				bundle.addEntry(bundleEntryPatient);
 			} else {
 				// We must have a patient.
@@ -100,10 +110,16 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			}
 			
 			// Add Observation.
-			List <Observation> returnedObservations = mapObservations(oruR01Message.getRESPONSE(i), subject);
+			List <Observation> returnedObservations = mapObservations(oruR01Message.getRESPONSE(i), patientReference);
 			for (Observation observation: returnedObservations) {
 				BundleEntryComponent bundleEntryObservation = new BundleEntryComponent();
 				bundleEntryObservation.setResource(observation);
+//				BundleEntryRequestComponent bundleEntryRequest = new BundleEntryRequestComponent();
+//				bundleEntryRequest.setMethod(HTTPVerb.POST);
+//				bundleEntryRequest.setUrl("Observation");
+//				bundleEntryObservation.setRequest(bundleEntryRequest);
+				UUID uuid = UUID.randomUUID();
+				bundleEntryObservation.setFullUrl("urn:uuid:"+uuid.toString());
 				bundle.addEntry(bundleEntryObservation);
 			}
 			
@@ -174,6 +190,8 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 					if (givenName != null && !givenName.isEmpty()) {
 						humanName.addGiven(givenName.getValue());
 					}
+					
+					patient.addName(humanName);
 					break;
 				}
 			}
@@ -208,7 +226,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 		return retVal;
 	}
 
-	public List<Observation> mapObservations(ORU_R01_RESPONSE response, Patient subject) {
+	public List<Observation> mapObservations(ORU_R01_RESPONSE response, String subjectReference) {
 		// Mapping Document:
 		// https://confluence.icl.gtri.org/pages/viewpage.action?pageId=22678246#NMStoFHIR(HL7v2.3toFHIR)-ForensicFormatHL7v2.3Specification
 
@@ -227,8 +245,8 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				ORU_R01_OBSERVATION hl7Observation = orderObservation.getOBSERVATION(j);
 
 				// Set the subject from the patient ID.
-				IdType IdType = new IdType("Patient", subject.getId());
-				Reference reference = new Reference(IdType);
+//				IdType IdType = new IdType("Patient", subject.getId());
+				Reference reference = new Reference(subjectReference);
 				observation.setSubject(reference);
 				
 				OBX obx = hl7Observation.getOBX();
@@ -364,7 +382,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 		try {
 			ID id = codeElement.getCe1_Identifier();
 			if (id != null && !id.isEmpty()) {
-				coding.setId(id.getValue());
+				coding.setCode(id.getValue());
 			}
 			ST display = codeElement.getCe2_Text();
 			if (display != null && !display.isEmpty()) {
@@ -391,17 +409,28 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			messageHeader = new MessageHeader();
 		
 		try {
-			// messageheader.event from MSH9.2
+			// messageheader.event from MSH9.2. MSH9.2 is triggering event.
+			// For ELR, it's R01. We need to map this to FHIR message-event, which
+			// can be observation-provide.
 			Coding eventCoding = new Coding();
 			CM_MSG msh9 = msh.getMsh9_MessageType();
 			if (msh9 != null && !msh9.isEmpty()) {
 				ID msh9_2 = msh9.getCm_msg2_TriggerEvent();
 				if (msh9_2 != null && !msh9_2.isEmpty()) {
-					eventCoding.setCode(msh9_2.getValue());
+					if (msh9_2.getValue().equals("R01")) {
+						MessageEvent messageEvent = MessageEvent.valueOf("OBSERVATIONPROVIDE");
+						eventCoding.setSystem(messageEvent.getSystem());
+						eventCoding.setCode(messageEvent.toCode());
+						eventCoding.setDisplay(messageEvent.getDisplay());
+					} else {
+						eventCoding.setCode(msh9_2.getValue());
+					}
 				}
 			} 
 			
 			if (eventCoding.isEmpty()) {
+				// We couldn't get any info from triggering event. Just set this to our default
+				// R01 event mapping. 
 				MessageEvent messageEvent = MessageEvent.valueOf("OBSERVATIONPROVIDE");
 				eventCoding.setSystem(messageEvent.getSystem());
 				eventCoding.setCode(messageEvent.toCode());
