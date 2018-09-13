@@ -30,6 +30,7 @@ import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.model.api.IFhirVersion;
 import ca.uhn.hl7v2.DefaultHapiContext;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
