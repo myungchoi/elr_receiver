@@ -22,6 +22,7 @@ import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
 import ca.uhn.hl7v2.HL7Exception;
+import ca.uhn.hl7v2.hoh.api.IAuthorizationServerCallback;
 import ca.uhn.hl7v2.model.Message;
 import ca.uhn.hl7v2.protocol.ReceivingApplication;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
@@ -45,13 +46,15 @@ import ca.uhn.hl7v2.util.Terser;
  * Implementation Guide: V251_IG_LB_LABRPTPH_R2_DSTU_R1.1_2014MAY.PDF (Available from HL7.org)
  */
 
-public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements IHL7v2ReceiverApplication {
+public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements IHL7v2ReceiverApplication, IAuthorizationServerCallback {
 	private String controller_api_url;
 	private boolean useTls;
 	private QueueFile queueFile = null;
 	private TimerTask timerTask = null;
 	private Timer timer= null;
 	private v myParser = null;
+	private String httpUser = null;
+	private String httpPw = null;
 
 	// Logger setup
 	final static Logger LOGGER = Logger.getLogger(HL7v2ReceiverApplication.class.getName());
@@ -83,11 +86,19 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implem
 		return controller_api_url;
 	}
 	
-	public void config(String controller_api_url, boolean useTls, String qFileName, String ecr_template_filename) 
+	public void config(String controller_api_url, boolean useTls, String qFileName, String ecr_template_filename, String httpAuth) 
 		throws Exception {
 		
 		this.controller_api_url = controller_api_url;
 		this.useTls = useTls;
+		
+		String[] httpAuthParam = httpAuth.split(":");
+		if (httpAuthParam.length == 2) {
+			this.httpUser = httpAuthParam[0];
+			this.httpPw = httpAuthParam[1];
+		} else {
+			LOGGER.error("Failed to load HTTP Basic Auth username and password. Please set it in the config.properties");
+		}
 		
 		// Set up QueueFile
 		if (queueFile == null) {
@@ -300,6 +311,17 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implem
 		return ret;
 	}
 	
+	public boolean authorize(String theUriPath, String theUsername, String thePassword) {
+		LOGGER.info("Authenticating for "+theUriPath+", "+theUsername+", "+thePassword);
+
+		return true;
+//		if (httpUser.equals(theUsername) && httpPw.equals(thePassword)) {
+//			return true;
+//		} else {
+//			return false;
+//		}
+	}
+
 //	void send_ecr(JSONObject ecrJson) 
 //		throws Exception {
 //

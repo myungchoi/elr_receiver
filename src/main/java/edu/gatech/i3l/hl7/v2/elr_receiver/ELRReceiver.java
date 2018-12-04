@@ -15,7 +15,12 @@ import ca.uhn.hl7v2.HapiContext;
 import ca.uhn.hl7v2.app.Connection;
 import ca.uhn.hl7v2.app.ConnectionListener;
 import ca.uhn.hl7v2.app.HL7Service;
+import ca.uhn.hl7v2.app.SimpleServer;
+import ca.uhn.hl7v2.hoh.llp.Hl7OverHttpLowerLayerProtocol;
+import ca.uhn.hl7v2.hoh.util.ServerRoleEnum;
+import ca.uhn.hl7v2.llp.LowerLayerProtocol;
 import ca.uhn.hl7v2.model.Message;
+import ca.uhn.hl7v2.parser.PipeParser;
 import ca.uhn.hl7v2.protocol.ReceivingApplication;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationExceptionHandler;
 
@@ -43,6 +48,8 @@ public class ELRReceiver
 	static String default_useTls_str = "False";
 	static String default_qFileName = "queueELR";
 	static String default_ecrTemplateFileName = "ECR.json";
+	static String default_transport = "MLLP";
+	static String default_httpAuth = "user:password";
 	
 	public static void main( String[] args ) throws Exception
 	{
@@ -56,6 +63,8 @@ public class ELRReceiver
 		String parser_mode = default_receiver_parser_mode;
 		String qFileName = default_qFileName;
 		String ecrTemplateFileName = default_ecrTemplateFileName;
+		String transport = default_transport;
+		String httpAuth = default_httpAuth;
 		
 		boolean writeConfig = false;
 		try {
@@ -68,6 +77,8 @@ public class ELRReceiver
 			parser_mode = prop.getProperty("HL7ParserMode", default_receiver_parser_mode);
 			qFileName = prop.getProperty("qFileName", default_qFileName);
 			ecrTemplateFileName = prop.getProperty("ecrFileName", default_ecrTemplateFileName);
+			transport = prop.getProperty("transport", default_transport);
+			httpAuth = prop.getProperty("HTTPAuth", default_httpAuth);
 			
 			if (prop.getProperty("useTls", default_useTls_str).equalsIgnoreCase("true")) {
 				useTls = true;
@@ -87,28 +98,60 @@ public class ELRReceiver
 				prop.setProperty("useTls", default_useTls_str);
 				prop.setProperty("qFileName", default_qFileName);
 				prop.setProperty("ecrFileName", default_ecrTemplateFileName);
+				prop.setProperty("transport", default_transport);
+				prop.setProperty("HTTPAuth", default_httpAuth);
 				prop.store(output, null);
 			}
 		}
 		
 		HapiContext ctx = new DefaultHapiContext();
-		HL7Service server = ctx.newServer(port, useTls);
 		
-		if (parser_mode.equals("FHIR")) {
-			HL7v2ReceiverFHIRApplication handler = new HL7v2ReceiverFHIRApplication();
-			server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
-			// Configure the Receiver App before we start.
-			handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName);
-		} else {
-			HL7v2ReceiverECRApplication handler = new HL7v2ReceiverECRApplication();
-			server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
-			// Configure the Receiver App before we start.
-			handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName);
-		}
-		server.registerConnectionListener(new MyConnectionListener());
-		server.setExceptionHandler(new MyExceptionHandler());
+		if ("MLLP".equals(transport)) {
+			HL7Service server = ctx.newServer(port, useTls);
+			
+			if (parser_mode.equals("FHIR")) {
+				HL7v2ReceiverFHIRApplication handler = new HL7v2ReceiverFHIRApplication();
+				server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
+				// Configure the Receiver App before we start.
+				handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName, httpAuth);
+			} else {
+				HL7v2ReceiverECRApplication handler = new HL7v2ReceiverECRApplication();
+				server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
+				// Configure the Receiver App before we start.
+				handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName, httpAuth);
+			}
+			server.registerConnectionListener(new MyConnectionListener());
+			server.setExceptionHandler(new MyExceptionHandler());
 
-		server.startAndWait();
+			server.startAndWait();
+
+		} else {
+			LowerLayerProtocol llp;
+			llp = new Hl7OverHttpLowerLayerProtocol(ServerRoleEnum.SERVER);
+			
+			PipeParser parser = PipeParser.getInstanceWithNoValidation();
+			SimpleServer server = new SimpleServer(port, llp, parser);
+			
+			if (parser_mode.equals("FHIR")) {
+				HL7v2ReceiverFHIRApplication handler = new HL7v2ReceiverFHIRApplication();
+				((Hl7OverHttpLowerLayerProtocol)llp).setAuthorizationCallback(handler);
+
+				server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
+				// Configure the Receiver App before we start.
+				handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName, httpAuth);
+			} else {
+				HL7v2ReceiverECRApplication handler = new HL7v2ReceiverECRApplication();
+				((Hl7OverHttpLowerLayerProtocol)llp).setAuthorizationCallback(handler);
+
+				server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
+				// Configure the Receiver App before we start.
+				handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName, httpAuth);
+			}
+			
+			server.start();
+			LOGGER.debug("HTTP server started");
+		}
+		
 	}
 	
 	public static class MyConnectionListener implements ConnectionListener {
