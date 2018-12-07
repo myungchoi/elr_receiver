@@ -80,8 +80,8 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 		// TODO: Implement this after discussing with LabCorp
 		
 		// Check the version = v2.5.1 or v2.3.1
-		
 		if (theMessage.getVersion().equalsIgnoreCase("2.3") == true) {
+			LOGGER.info("Message Received with v2.3. Setting a parser for FHIR STU3");
 			setMyParser((v) new HL7v23FhirStu3Parser());
 		} else {
 			LOGGER.info("Message Received, but is not v2.3. Received message version is "+theMessage.getVersion());

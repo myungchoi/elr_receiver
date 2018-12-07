@@ -46,25 +46,27 @@ import ca.uhn.hl7v2.util.Terser;
  * Implementation Guide: V251_IG_LB_LABRPTPH_R2_DSTU_R1.1_2014MAY.PDF (Available from HL7.org)
  */
 
-public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implements IHL7v2ReceiverApplication, IAuthorizationServerCallback {
+public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser>
+		implements IHL7v2ReceiverApplication, IAuthorizationServerCallback {
 	private String controller_api_url;
 	private boolean useTls;
 	private QueueFile queueFile = null;
 	private TimerTask timerTask = null;
-	private Timer timer= null;
+	private Timer timer = null;
 	private v myParser = null;
 	private String httpUser = null;
 	private String httpPw = null;
 
 	// Logger setup
 	final static Logger LOGGER = Logger.getLogger(HL7v2ReceiverApplication.class.getName());
-	
+
 	// Error Status
 	static int PID_ERROR = -1;
+
 	static enum ErrorCode {
 		NOERROR, MSH, PID, ORDER_OBSERVATION, LAB_RESULTS, INTERNAL;
 	}
-	
+
 //	public static JSONObject parseJSONFile(String filename) throws JSONException, IOException {
 //        String content = new String(Files.readAllBytes(Paths.get(filename)));
 //        return new JSONObject(content);
@@ -73,51 +75,54 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implem
 	public void setMyParser(v myParser) {
 		this.myParser = myParser;
 	}
-	
+
 	public v getMyParser() {
 		return myParser;
 	}
-	
+
 	public QueueFile getQueueFile() {
 		return queueFile;
 	}
-	
+
 	public String getControllerApiUrl() {
 		return controller_api_url;
 	}
-	
-	public void config(String controller_api_url, boolean useTls, String qFileName, String ecr_template_filename, String httpAuth) 
-		throws Exception {
-		
+
+	public void config(String controller_api_url, boolean useTls, String qFileName, String ecr_template_filename,
+			String httpAuth) throws Exception {
+
 		this.controller_api_url = controller_api_url;
 		this.useTls = useTls;
-		
-		String[] httpAuthParam = httpAuth.split(":");
-		if (httpAuthParam.length == 2) {
-			this.httpUser = httpAuthParam[0];
-			this.httpPw = httpAuthParam[1];
-		} else {
-			LOGGER.error("Failed to load HTTP Basic Auth username and password. Please set it in the config.properties");
+
+		if (httpAuth != null && !httpAuth.isEmpty()) {
+			String[] httpAuthParam = httpAuth.split(":");
+			if (httpAuthParam.length == 2) {
+				this.httpUser = httpAuthParam[0];
+				this.httpPw = httpAuthParam[1];
+			} else {
+				LOGGER.error(
+						"Failed to load HTTP Basic Auth username and password. Please set it in the config.properties");
+			}
 		}
-		
+
 		// Set up QueueFile
 		if (queueFile == null) {
 			File file = new File(qFileName);
 			queueFile = new QueueFile.Builder(file).build();
 		}
-		
+
 		// After QueueFile is set up, we start background service.
 		if (timerTask == null)
 			timerTask = new QueueTaskTimer(this);
-		
+
 		if (timer == null)
 			timer = new Timer(true);
 		else
 			timer.cancel();
-		
-		timer.scheduleAtFixedRate(timerTask, 20*1000, 10*1000);
+
+		timer.scheduleAtFixedRate(timerTask, 20 * 1000, 10 * 1000);
 	}
-	
+
 	public boolean canProcess(Message theMessage) {
 		// Override this method. If not override, we will return cannot process.
 		return false;
@@ -125,12 +130,14 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implem
 
 	public Message processMessage(Message theMessage, Map<String, Object> theMetadata)
 			throws ReceivingApplicationException, HL7Exception {
+		LOGGER.debug("Message to be processed: \n" + theMessage.toString());
+
 		ErrorCode error = mapMyMessage(theMessage);
 		if (error != ErrorCode.NOERROR) {
 			// Create an exception.
 			throw new HL7Exception(error.toString());
 		}
-		
+
 		try {
 			return theMessage.generateACK();
 		} catch (IOException e) {
@@ -139,7 +146,7 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implem
 			throw new ReceivingApplicationException(e);
 		}
 	}
-	
+
 	protected ErrorCode mapMyMessage(Message msg) {
 		// Override this to return correct return code to HL7 v2 sender.
 		return null;
@@ -279,42 +286,43 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser> implem
 //		return ErrorCode.NOERROR;
 //	}
 //	
-	
+
 	public int process_q() {
 		String jsonString = "";
 		int ret = 0;
-		if (queueFile.isEmpty()) return ret;
+		if (queueFile.isEmpty())
+			return ret;
 		boolean success = true;
 		try {
 			byte[] data = queueFile.peek();
 			queueFile.remove();
-			jsonString = new String (data, StandardCharsets.UTF_8);
-			System.out.println("JSON object from queue("+queueFile.size()+"):"+jsonString);
-			JSONObject ecrJson = new JSONObject (jsonString);
+			jsonString = new String(data, StandardCharsets.UTF_8);
+			System.out.println("JSON object from queue(" + queueFile.size() + "):" + jsonString);
+			JSONObject ecrJson = new JSONObject(jsonString);
 			sendData(ecrJson);
 		} catch (JSONException e) {
 			success = false;
 			// We have ill-formed JSON. Remove it from queue.
-			LOGGER.error("Failed to process JSON data in Queue: "+e.getMessage()+"\nJSON data:"+jsonString);
+			LOGGER.error("Failed to process JSON data in Queue: " + e.getMessage() + "\nJSON data:" + jsonString);
 			e.printStackTrace();
 		} catch (Exception e) {
 			success = false;
 			e.printStackTrace();
 		}
-		
+
 		if (success) {
 			ret = queueFile.size();
 		} else {
 			ret = -1;
 		}
-		
+
 		return ret;
 	}
-	
-	public boolean authorize(String theUriPath, String theUsername, String thePassword) {
-		LOGGER.info("Authenticating for "+theUriPath+", "+theUsername+", "+thePassword);
 
-		if ("/elrreceiver".equals(theUriPath) || "/elrreceiver/".equals(theUriPath)) 
+	public boolean authorize(String theUriPath, String theUsername, String thePassword) {
+		LOGGER.info("Authenticating for " + theUriPath + ", " + theUsername + ", " + thePassword);
+
+		if ("/elrreceiver".equals(theUriPath) || "/elrreceiver/".equals(theUriPath))
 			return true;
 		else
 			return false;
