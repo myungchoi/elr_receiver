@@ -322,10 +322,15 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser>
 	public boolean authorize(String theUriPath, String theUsername, String thePassword) {
 		LOGGER.info("Authenticating for " + theUriPath + ", " + theUsername + ", " + thePassword);
 
-		if ("/elrreceiver".equals(theUriPath) || "/elrreceiver/".equals(theUriPath))
-			return true;
-		else
-			return false;
+		if ("/elrreceiver".equals(theUriPath) || "/elrreceiver/".equals(theUriPath)) {
+			if (httpUser.equals(theUsername) && httpPw.equals(thePassword)) {
+				return true;
+			}
+		}
+		
+		return false;
+		
+		
 //		if (httpUser.equals(theUsername) && httpPw.equals(thePassword)) {
 //			return true;
 //		} else {
