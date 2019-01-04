@@ -19,10 +19,12 @@ import org.hl7.fhir.dstu3.model.MessageHeader;
 import org.hl7.fhir.dstu3.model.MessageHeader.MessageDestinationComponent;
 import org.hl7.fhir.dstu3.model.MessageHeader.MessageSourceComponent;
 import org.hl7.fhir.dstu3.model.Observation;
+import org.hl7.fhir.dstu3.model.Observation.ObservationReferenceRangeComponent;
 import org.hl7.fhir.dstu3.model.Observation.ObservationStatus;
 import org.hl7.fhir.dstu3.model.Patient;
 import org.hl7.fhir.dstu3.model.Quantity;
 import org.hl7.fhir.dstu3.model.Reference;
+import org.hl7.fhir.dstu3.model.SimpleQuantity;
 import org.hl7.fhir.dstu3.model.StringType;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryRequestComponent;
@@ -57,6 +59,7 @@ import ca.uhn.hl7v2.model.v23.segment.ORC;
 
 public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 	MessageHeader messageHeader = null;
+	String sendingFacilityName = null;
 
 	// Logger setup
 	final static Logger LOGGER = Logger.getLogger(HL7v23FhirStu3Parser.class.getName());
@@ -69,11 +72,19 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 		setMyVersion("2.3");
 	}
 
+	public String getSendingFacilityName() {
+		return this.sendingFacilityName;
+	}
+
+	public void setSendingFacilityName(String sendingFacilityName) {
+		this.sendingFacilityName = sendingFacilityName;
+	}
+
 	public List<Bundle> executeParser(Message msg) {
 		ca.uhn.hl7v2.model.v23.message.ORU_R01 oruR01Message = (ca.uhn.hl7v2.model.v23.message.ORU_R01) msg;
 		List<Bundle> bundles = new ArrayList<Bundle>();
 		Patient subject = null;
-		
+
 		// First clear up the list.
 		initialize(msg);
 
@@ -81,11 +92,11 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 		for (int i = 0; i < numberOfResponses; i++) {
 			Bundle bundle = new Bundle();
 			bundle.setType(Bundle.BundleType.MESSAGE);
-			
+
 			BundleEntryComponent bundleEntryMessageHeader = new BundleEntryComponent();
 			bundleEntryMessageHeader.setResource(messageHeader);
 			bundle.addEntry(bundleEntryMessageHeader);
-					
+
 			List<Patient> returnedPatients = mapPatients(oruR01Message.getRESPONSE(i));
 			// v2.3 says that there should be 1 patient. This library reads as many.
 			// We just use first one if the returnedPatients is not empty.
@@ -94,24 +105,24 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				BundleEntryComponent bundleEntryPatient = new BundleEntryComponent();
 				subject = returnedPatients.get(0);
 				bundleEntryPatient.setResource(subject);
-				//TODO: revisit this if we found a case where we can put request in bundle.
+				// TODO: revisit this if we found a case where we can put request in bundle.
 				// for now, FHIR spec does not indicate message to have request or response.
 //				BundleEntryRequestComponent bundleEntryRequest = new BundleEntryRequestComponent();
 //				bundleEntryRequest.setMethod(HTTPVerb.POST);
 //				bundleEntryRequest.setUrl("Patient");
 //				bundleEntryPatient.setRequest(bundleEntryRequest);
 				UUID uuid = UUID.randomUUID();
-				patientReference = "urn:uuid:"+uuid.toString();
+				patientReference = "urn:uuid:" + uuid.toString();
 				bundleEntryPatient.setFullUrl(patientReference);
 				bundle.addEntry(bundleEntryPatient);
 			} else {
 				// We must have a patient.
 				return null;
 			}
-			
+
 			// Add Observation.
-			List <Observation> returnedObservations = mapObservations(oruR01Message.getRESPONSE(i), patientReference);
-			for (Observation observation: returnedObservations) {
+			List<Observation> returnedObservations = mapObservations(oruR01Message.getRESPONSE(i), patientReference);
+			for (Observation observation : returnedObservations) {
 				BundleEntryComponent bundleEntryObservation = new BundleEntryComponent();
 				bundleEntryObservation.setResource(observation);
 //				BundleEntryRequestComponent bundleEntryRequest = new BundleEntryRequestComponent();
@@ -119,13 +130,13 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 //				bundleEntryRequest.setUrl("Observation");
 //				bundleEntryObservation.setRequest(bundleEntryRequest);
 				UUID uuid = UUID.randomUUID();
-				bundleEntryObservation.setFullUrl("urn:uuid:"+uuid.toString());
+				bundleEntryObservation.setFullUrl("urn:uuid:" + uuid.toString());
 				bundle.addEntry(bundleEntryObservation);
 			}
-			
+
 			bundles.add(bundle);
 		}
-		
+
 		return bundles;
 	}
 
@@ -149,7 +160,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 					return null;
 				}
 			}
-			
+
 			// PID-3 to patient.identifier.
 			// This is NMS Workorder number assigned by NMS
 			int numberOfPid3 = pid.getPid3_PatientIDInternalIDReps();
@@ -190,7 +201,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 					if (givenName != null && !givenName.isEmpty()) {
 						humanName.addGiven(givenName.getValue());
 					}
-					
+
 					patient.addName(humanName);
 					break;
 				}
@@ -233,133 +244,174 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 		List<Observation> retVal = new ArrayList<Observation>();
 
 		try {
-		int totalNumberOfOrderObservation = response.getORDER_OBSERVATIONReps();
-		for (int i=0; i<totalNumberOfOrderObservation; i++) {
-			// OBR-3 + OBX-3 + OBX-4 to observation.identifier
-			ORU_R01_ORDER_OBSERVATION orderObservation = response.getORDER_OBSERVATION(i);
-			
-			int totalNumberOfObservation = orderObservation.getOBSERVATIONReps();
-			for (int j=0; j<totalNumberOfObservation; j++) {
-				Observation observation = new Observation();
-				
-				ORU_R01_OBSERVATION hl7Observation = orderObservation.getOBSERVATION(j);
+			int totalNumberOfOrderObservation = response.getORDER_OBSERVATIONReps();
+			for (int i = 0; i < totalNumberOfOrderObservation; i++) {
+				ORU_R01_ORDER_OBSERVATION orderObservation = response.getORDER_OBSERVATION(i);
+				OBR obr = orderObservation.getOBR();
 
-				// Set the subject from the patient ID.
+				int totalNumberOfObservation = orderObservation.getOBSERVATIONReps();
+				for (int j = 0; j < totalNumberOfObservation; j++) {
+					Observation observation = new Observation();
+
+					ORU_R01_OBSERVATION hl7Observation = orderObservation.getOBSERVATION(j);
+
+					// Set the subject from the patient ID.
 //				IdType IdType = new IdType("Patient", subject.getId());
-				Reference reference = new Reference(subjectReference);
-				observation.setSubject(reference);
-				
-				OBX obx = hl7Observation.getOBX();
+					Reference reference = new Reference(subjectReference);
+					observation.setSubject(reference);
 
-				// Value Type for observation.value[x]
-				ID valueType = obx.getObx2_ValueType();	
-				Varies observationValue = obx.getObx5_ObservationValue(0);
-				if (valueType.getValue().equals("NM")) {
-					// This should be valueQuantity
-					// obx5 is the ST value in NMS message
-					Quantity quantity = new Quantity();
-					NM numericValue = (NM) observationValue.getData();
-					quantity.setValue(Double.parseDouble(numericValue.getValue()));
-					
-					// Set the unit if available.
+					OBX obx = hl7Observation.getOBX();
+
+					// See if we have a unit (from OBX-6)
+					// Set the unit if available from OBX-6
 					CE unit = obx.getObx6_Units();
-					ID id = unit.getCe1_Identifier();
-					if (id != null && !id.isEmpty()) {
-						quantity.setUnit(id.getValue());
-						quantity.setCode(id.getValue());
-					}
-					ST system = unit.getCe3_NameOfCodingSystem();
-					if (system != null && !system.isEmpty()) {
-						quantity.setSystem(system.getValue());
-					}
-					
-					observation.setValue(quantity);					
-				} else { // ST and TX - we treat both ST and TX as String
-					StringType valueString = null;
-					if (valueType.getValue().equals("ST")) {
-						ST stringValue = (ST) observationValue.getData();
-						valueString = new StringType(stringValue.getValue());
-					} else {
-						TX textValue = (TX) observationValue.getData();
-						valueString = new StringType(textValue.getValue());
-					}
-					observation.setValue(valueString);
-				}
+					String unitString = new String();
+					String unitCodeString = new String();
+					String unitSystemString = new String();
+					if (!unit.isEmpty()) {
+						ID id = unit.getCe1_Identifier();
+						if (id != null && !id.isEmpty()) {
+							unitString = id.getValue().replace("mcg", "ug").replace(" Creat" , "{creat}");
+							unitCodeString = id.getValue().replace("mcg", "ug").replace(" Creat" , "{creat}");
+						}
 
-				// observation.code from OBX-3
-				CE obx3 = obx.getObx3_ObservationIdentifier();
-				CodeableConcept codeableConcept = getCodeableConceptFromCE (obx3);
-				observation.setCode(codeableConcept);
-			
-				// observation.status from OBX-11
-				ID obx11 = obx.getObx11_ObservResultStatus();
-				if (obx11 != null && !obx11.isEmpty()) {
-					String hl7Status = obx11.getValue();
-					if ("F".equals(hl7Status)) {
-						// Final Result.
-						observation.setStatus(ObservationStatus.FINAL);
-					} else if ("C".equals(hl7Status)) {
-						// Record coming over is a correction and thus replaces a final result.
-						observation.setStatus(ObservationStatus.AMENDED);
-					} else if ("X".equals(hl7Status)) {
-						// Record coming over is a correction and thus replaces a final result.
-						observation.setStatus(ObservationStatus.CANCELLED);
-					} else if ("P".equals(hl7Status)) {
-						// Record coming over is a correction and thus replaces a final result.
-						observation.setStatus(ObservationStatus.PRELIMINARY);
-					} else {
-						LOGGER.fatal("OBX received with status = "+hl7Status+". (Table:"+obx11.getTable()+")");
-						continue;
+						ST system = unit.getCe3_NameOfCodingSystem();
+						if (system != null && !system.isEmpty()) {
+							unitSystemString = system.getValue();
+						} 
 					}
-				}
-				
-				// effective[x] from obx14
-				TS observationDateTime = obx.getObx14_DateTimeOfTheObservation();
-				DateTimeType dateTimeType = new DateTimeType(observationDateTime.getTs1_TimeOfAnEvent().getValueAsDate());
-				observation.setEffective(dateTimeType);
-				
-				int totalNumberOfNTE = hl7Observation.getNTEReps();
-				String comments = null;
-				for (int k=0; k<totalNumberOfNTE; k++) {
-					// This is a comment. Observation can contain one comment.
-					// So we combine all the NTEs.
-					NTE nte = hl7Observation.getNTE(k);
-					if (nte != null && !nte.isEmpty()) {
-						int totalNumberOfNTEComment = nte.getNte3_CommentReps();
-						for (int n=0; n<totalNumberOfNTEComment; n++) {
-							FT nte3 = nte.getNte3_Comment(n);
-							if (nte3 != null && !nte3.isEmpty()) {
-								if (comments == null) {
-									comments = nte3.getValue();
-								} else {
-									comments = comments.concat(". "+nte3.getValue());
+
+					// Value Type for observation.value[x] and observation.referenceRange
+					ID valueType = obx.getObx2_ValueType();
+					Varies observationValue = obx.getObx5_ObservationValue(0);
+					if (valueType.getValue().equals("NM")) {
+						// This should be valueQuantity
+						// obx5 is the ST value in NMS message
+						Quantity quantity = new Quantity();
+						NM numericValue = (NM) observationValue.getData();
+						quantity.setValue(Double.parseDouble(numericValue.getValue()));
+
+						// Set the unit if available from OBX-6
+						if (!unitString.isEmpty()) {
+							quantity.setUnit(unitString);
+							quantity.setCode(unitCodeString);
+						}
+						if (!unitSystemString.isEmpty()) {
+							quantity.setSystem(unitSystemString);
+						}
+
+						observation.setValue(quantity);
+					} else { // ST and TX - we treat both ST and TX as String
+						StringType valueString = null;
+						if (valueType.getValue().equals("ST")) {
+							ST stringValue = (ST) observationValue.getData();
+							valueString = new StringType(stringValue.getValue());
+						} else {
+							TX textValue = (TX) observationValue.getData();
+							valueString = new StringType(textValue.getValue());
+						}
+						observation.setValue(valueString);
+					}
+
+					// observation.code from OBX-3
+					CE obx3 = obx.getObx3_ObservationIdentifier();
+					CodeableConcept codeableConcept = getCodeableConceptFromCE(obx3);
+					observation.setCode(codeableConcept);
+
+					// observation.referenceRange from OBX-7
+					ST obx7 = obx.getObx7_ReferencesRange();
+					if (!obx7.isEmpty()) {
+						String obx7StringValue = obx7.getValue();
+						ObservationReferenceRangeComponent referenceRangeComponent = new ObservationReferenceRangeComponent();
+
+						try {
+							double obx7Value = Double.parseDouble(obx7StringValue);
+							SimpleQuantity simpleQuantity = new SimpleQuantity();
+							simpleQuantity.setValue(obx7Value);
+							if (!unitString.isEmpty()) {
+								simpleQuantity.setUnit(unitString);
+								simpleQuantity.setCode(unitCodeString);
+							}
+							if (!unitSystemString.isEmpty()) {
+								simpleQuantity.setSystem(unitSystemString);
+							}
+							referenceRangeComponent.setHigh(simpleQuantity);
+						} catch (NumberFormatException nfe) {
+							referenceRangeComponent.setText(obx7StringValue);
+						}
+
+						observation.addReferenceRange(referenceRangeComponent);
+					}
+					// observation.status from OBX-11
+					ID obx11 = obx.getObx11_ObservResultStatus();
+					if (obx11 != null && !obx11.isEmpty()) {
+						String hl7Status = obx11.getValue();
+						if ("F".equals(hl7Status)) {
+							// Final Result.
+							observation.setStatus(ObservationStatus.FINAL);
+						} else if ("C".equals(hl7Status)) {
+							// Record coming over is a correction and thus replaces a final result.
+							observation.setStatus(ObservationStatus.AMENDED);
+						} else if ("X".equals(hl7Status)) {
+							// Record coming over is a correction and thus replaces a final result.
+							observation.setStatus(ObservationStatus.CANCELLED);
+						} else if ("P".equals(hl7Status)) {
+							// Record coming over is a correction and thus replaces a final result.
+							observation.setStatus(ObservationStatus.PRELIMINARY);
+						} else {
+							LOGGER.fatal(
+									"OBX received with status = " + hl7Status + ". (Table:" + obx11.getTable() + ")");
+							continue;
+						}
+					}
+
+					// effective[x] from obx14
+					TS observationDateTime = obx.getObx14_DateTimeOfTheObservation();
+					DateTimeType dateTimeType = new DateTimeType(
+							observationDateTime.getTs1_TimeOfAnEvent().getValueAsDate());
+					observation.setEffective(dateTimeType);
+
+					int totalNumberOfNTE = hl7Observation.getNTEReps();
+					String comments = null;
+					for (int k = 0; k < totalNumberOfNTE; k++) {
+						// This is a comment. Observation can contain one comment.
+						// So we combine all the NTEs.
+						NTE nte = hl7Observation.getNTE(k);
+						if (nte != null && !nte.isEmpty()) {
+							int totalNumberOfNTEComment = nte.getNte3_CommentReps();
+							for (int n = 0; n < totalNumberOfNTEComment; n++) {
+								FT nte3 = nte.getNte3_Comment(n);
+								if (nte3 != null && !nte3.isEmpty()) {
+									if (comments == null) {
+										comments = nte3.getValue();
+									} else {
+										comments = comments.concat(". " + nte3.getValue());
+									}
 								}
 							}
 						}
 					}
+					if (comments != null) {
+						observation.setComment(comments);
+					}
+
+					retVal.add(observation);
 				}
-				if (comments != null) {
-					observation.setComment(comments);
-				}
-				
-				retVal.add(observation);
 			}
-		}
-		
+
 		} catch (HL7Exception e) {
 			e.printStackTrace();
 			return null;
 		}
-		
-		
+
 		return retVal;
 	}
 
-	private String getValueOfHD (HD hd) {
+	private String getValueOfHD(HD hd) {
 		IS hd1 = hd.getHd1_NamespaceID();
 		ST hd2 = hd.getHd2_UniversalID();
 		ID hd3 = hd.getHd3_UniversalIDType();
-		
+
 		try {
 			if (hd2 != null && !hd2.isEmpty()) {
 				return hd2.getValue();
@@ -374,10 +426,10 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			return null;
 		}
 	}
-	
-	private CodeableConcept getCodeableConceptFromCE (CE codeElement) {
+
+	private CodeableConcept getCodeableConceptFromCE(CE codeElement) {
 		CodeableConcept retVal = new CodeableConcept();
-		
+
 		Coding coding = new Coding();
 		try {
 			ID id = codeElement.getCe1_Identifier();
@@ -391,6 +443,11 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			ST system = codeElement.getCe3_NameOfCodingSystem();
 			if (system != null && !system.isEmpty()) {
 				coding.setSystem(system.getValue());
+			} else {
+				// Put facility name for the system if available.
+				// For now, we put NMS Labs if sending facility is NMS.
+				if (getSendingFacilityName().equalsIgnoreCase("NMS"))
+					coding.setSystem("NMS Labs");
 			}
 			if (!coding.isEmpty()) {
 				retVal.addCoding(coding);
@@ -402,13 +459,21 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 
 		return retVal;
 	}
-	
+
 	public MessageHeader mapMessageHeader(ca.uhn.hl7v2.model.v23.message.ORU_R01 oruR01message) {
 		MSH msh = oruR01message.getMSH();
 		if (messageHeader == null)
 			messageHeader = new MessageHeader();
-		
+
+		HD sendingFacility = msh.getSendingFacility();
 		try {
+			if (!sendingFacility.isEmpty()) {
+				IS sendingFacilityName = sendingFacility.getHd1_NamespaceID();
+				if (!sendingFacilityName.isEmpty()) {
+					setSendingFacilityName(sendingFacilityName.getValue());
+				}
+			}
+
 			// messageheader.event from MSH9.2. MSH9.2 is triggering event.
 			// For ELR, it's R01. We need to map this to FHIR message-event, which
 			// can be observation-provide.
@@ -426,19 +491,19 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 						eventCoding.setCode(msh9_2.getValue());
 					}
 				}
-			} 
-			
+			}
+
 			if (eventCoding.isEmpty()) {
 				// We couldn't get any info from triggering event. Just set this to our default
-				// R01 event mapping. 
+				// R01 event mapping.
 				MessageEvent messageEvent = MessageEvent.valueOf("OBSERVATIONPROVIDE");
 				eventCoding.setSystem(messageEvent.getSystem());
 				eventCoding.setCode(messageEvent.toCode());
 				eventCoding.setDisplay(messageEvent.getDisplay());
 			}
-			
+
 			messageHeader.setEvent(eventCoding);
-			
+
 			// messageevent.destination.name from MSH5 and MSH6
 			MessageDestinationComponent messageDestination = new MessageDestinationComponent();
 			HD msh5 = msh.getMsh5_ReceivingApplication();
@@ -446,7 +511,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			if (destinationName != null && !destinationName.isEmpty()) {
 				messageDestination.setName(destinationName);
 			}
-			
+
 			HD msh6 = msh.getMsh6_ReceivingFacility();
 			String destinationEndpoint = getValueOfHD(msh6);
 			if (destinationEndpoint != null && !destinationEndpoint.isEmpty()) {
@@ -456,7 +521,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			if (!messageDestination.isEmpty()) {
 				messageHeader.addDestination(messageDestination);
 			}
-			
+
 			// messageHeader.timestamp from MSH-7
 			TS msh7 = msh.getMsh7_DateTimeOfMessage();
 			if (msh7 != null && !msh7.isEmpty()) {
@@ -465,7 +530,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 					messageHeader.setTimestamp(timeOfEvent.getValueAsDate());
 				}
 			}
-			
+
 			// messageHeader.source from MSH-3
 			HD msh3 = msh.getMsh3_SendingApplication();
 			String sourceDestination = getValueOfHD(msh3);
@@ -474,13 +539,13 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				messageSource.setEndpoint(sourceDestination);
 				messageHeader.setSource(messageSource);
 			}
-			
+
 		} catch (HL7Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return null;
 		}
-		
+
 		return messageHeader;
 	}
 

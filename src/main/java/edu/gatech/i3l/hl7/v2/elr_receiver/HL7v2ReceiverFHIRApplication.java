@@ -139,22 +139,22 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 	private void sendFhir(JSONObject fhirJsonObject) 
 		throws Exception {
 
-		System.out.println("FHIR Message submitted:"+fhirJsonObject.toString());
+		LOGGER.debug("FHIR Message submitted:"+fhirJsonObject.toString());
 
-//		Client client = Client.create();
-//		WebResource webResource = client.resource(getControllerApiUrl());
-//		
-//		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, fhirJsonObject.toString());
-//		if (response.getStatus() != 201 && response.getStatus() != 200) {
-//			// Failed to write ECR. We should put this in the queue and retry.
-//			LOGGER.error("Failed to talk to FHIR Controller for Message:\n"+fhirJsonObject.toString());
-//			System.out.println("Failed to talk to FHIR controller:"+fhirJsonObject.toString());
-//			getQueueFile().add(fhirJsonObject.toString().getBytes());
-//			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
-//		} else {
-//			LOGGER.info("FHIR Message submitted:"+fhirJsonObject.toString());
-//			System.out.println("FHIR Message submitted:"+fhirJsonObject.toString());
-//		}
+		Client client = Client.create();
+		WebResource webResource = client.resource(getControllerApiUrl());
+		
+		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, fhirJsonObject.toString());
+		if (response.getStatus() != 201 && response.getStatus() != 200) {
+			// Failed to write ECR. We should put this in the queue and retry.
+			LOGGER.error("Failed to talk to FHIR Controller for Message:\n"+fhirJsonObject.toString());
+			System.out.println("Failed to talk to FHIR controller:"+fhirJsonObject.toString());
+			getQueueFile().add(fhirJsonObject.toString().getBytes());
+			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
+		} else {
+			LOGGER.info("FHIR Message submitted:"+fhirJsonObject.toString());
+			System.out.println("FHIR Message submitted:"+fhirJsonObject.toString());
+		}
 	}
 
 	public void sendData(JSONObject jsonData) {
