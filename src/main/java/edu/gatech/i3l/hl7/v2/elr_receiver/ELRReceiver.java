@@ -98,6 +98,45 @@ public class ELRReceiver {
 				prop.store(output, null);
 			}
 		}
+		
+		// End point configuration override by environment variable.
+		String envEcrUrl = System.getenv("ECR_URL");
+		if (envEcrUrl != null && !envEcrUrl.isEmpty()) {
+			if (!envEcrUrl.startsWith("http://") && !envEcrUrl.startsWith("https://")) {
+				envEcrUrl = "http://"+envEcrUrl;
+			}
+			
+			if (envEcrUrl.endsWith("/")) {
+				envEcrUrl = envEcrUrl.substring(0, envEcrUrl.length()-1);
+			}
+			
+			phcr_controller_api_url = envEcrUrl;
+		}
+
+		String envFhirUrl = System.getenv("FHIR_URL");
+		if (envFhirUrl != null && !envFhirUrl.isEmpty()) {
+			if (!envFhirUrl.startsWith("http://") && !envFhirUrl.startsWith("https://")) {
+				envFhirUrl = "http://"+envFhirUrl;
+			}
+			
+			if (envFhirUrl.endsWith("/")) {
+				envFhirUrl = envFhirUrl.substring(0, envFhirUrl.length()-1);
+			}
+			
+			fhir_controller_api_url = envFhirUrl;
+		}
+		
+		// parser mode override by environment variable
+		String envParserMode = System.getenv("PARSER_MODE");
+		if (envParserMode != null && !envParserMode.isEmpty()) {
+			parser_mode = envParserMode;
+		}
+		
+		// transport mode override by environment variable
+		String envTransport = System.getenv("TRANSPORT_MODE");
+		if (envTransport != null && !envTransport.isEmpty()) {
+			transport = envTransport;
+		}
 
 		if ("MLLP".equals(transport)) {
 			HapiContext ctx = new DefaultHapiContext();

@@ -264,20 +264,21 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 		Long id_num = (Long) (timestamp.getTime()/10000);
 		ecrJson.put("id", id_num.toString());
 		
-		Client client = Client.create();
-		WebResource webResource = client.resource(getControllerApiUrl());
-		
-		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson.toString());
-		if (response.getStatus() != 201 && response.getStatus() != 200) {
-			// Failed to write ECR. We should put this in the queue and retry.
-			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
-			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
-			getQueueFile().add(ecrJson.toString().getBytes());
-			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
-		} else {
-			LOGGER.info("ECR Report submitted:"+ecrJson.toString());
-			System.out.println("ECR Report submitted:"+ecrJson.toString());
-		}
+		LOGGER.debug("Sending: "+ecrJson.toString());
+//		Client client = Client.create();
+//		WebResource webResource = client.resource(getControllerApiUrl());
+//		
+//		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, ecrJson.toString());
+//		if (response.getStatus() != 201 && response.getStatus() != 200) {
+//			// Failed to write ECR. We should put this in the queue and retry.
+//			LOGGER.error("Failed to talk to PHCR controller for ECR Resport:\n"+ecrJson.toString());
+//			System.out.println("Failed to talk to PHCR controller:"+ecrJson.toString());
+//			getQueueFile().add(ecrJson.toString().getBytes());
+//			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
+//		} else {
+//			LOGGER.info("ECR Report submitted:"+ecrJson.toString());
+//			System.out.println("ECR Report submitted:"+ecrJson.toString());
+//		}
 	}
 
 	public void sendData(JSONObject jsonData) {
