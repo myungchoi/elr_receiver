@@ -8,6 +8,7 @@ Java application that listens to
 
 
 Use config.property to set the variable. Or, environment variables as shown below,
+
 | Environment Variables    | Example     |
 | ------------------------ | ----------- |
 | ECR_URL | http://host:8080/ecr |
