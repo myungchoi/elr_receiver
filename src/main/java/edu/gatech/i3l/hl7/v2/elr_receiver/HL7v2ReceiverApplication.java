@@ -56,6 +56,7 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser>
 	private v myParser = null;
 	private String httpUser = null;
 	private String httpPw = null;
+	private String indexServiceApiUrl;
 
 	// Logger setup
 	final static Logger LOGGER = Logger.getLogger(HL7v2ReceiverApplication.class.getName());
@@ -87,11 +88,16 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser>
 	public String getControllerApiUrl() {
 		return controller_api_url;
 	}
+	
+	public String getIndexServiceApiUrl() {
+		return indexServiceApiUrl;
+	}
 
 	public void config(String controller_api_url, boolean useTls, String qFileName, String ecr_template_filename,
-			String httpAuth) throws Exception {
+			String httpAuth, String indexServiceApiUrl) throws Exception {
 
 		this.controller_api_url = controller_api_url;
+		this.indexServiceApiUrl = indexServiceApiUrl;
 		this.useTls = useTls;
 
 		if (httpAuth != null && !httpAuth.isEmpty()) {

@@ -60,6 +60,7 @@ import ca.uhn.hl7v2.model.v23.segment.ORC;
 public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 	MessageHeader messageHeader = null;
 	String sendingFacilityName = null;
+	String receivingFacilityName = null;
 
 	// Logger setup
 	final static Logger LOGGER = Logger.getLogger(HL7v23FhirStu3Parser.class.getName());
@@ -78,6 +79,14 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 
 	public void setSendingFacilityName(String sendingFacilityName) {
 		this.sendingFacilityName = sendingFacilityName;
+	}
+	
+	public String getReceivingFacilityName() {
+		return this.receivingFacilityName;
+	}
+	
+	public void setReceivingFacilityName(String receivingFacilityName) {
+		this.receivingFacilityName = receivingFacilityName;
 	}
 
 	public List<Bundle> executeParser(Message msg) {
@@ -148,13 +157,19 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			ORU_R01_PATIENT patientHL7 = response.getPATIENT();
 			ca.uhn.hl7v2.model.v23.segment.PID pid = patientHL7.getPID();
 
+			patient.setId(UUID.randomUUID().toString());
+			
 			// PID-2 to patient ID.
 			// This is the accession number of NMS' client.
 			CX pid2 = pid.getPid2_PatientIDExternalID();
 			if (pid2 != null && !pid2.isEmpty()) {
 				ST id = pid2.getCx1_ID();
 				if (id != null && !id.isEmpty()) {
-					patient.setId(id.getValue());
+//					patient.setId(id.getValue());
+					Identifier identifier = new Identifier();
+					identifier.setSystem("External_Patient_ID");
+					identifier.setValue(id.getValue());
+					patient.addIdentifier(identifier);
 				} else {
 					// PID2 is required for NMS outbound message.
 					return null;
@@ -466,6 +481,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			messageHeader = new MessageHeader();
 
 		HD sendingFacility = msh.getSendingFacility();
+		HD receivingFacility = msh.getReceivingFacility();
 		try {
 			if (!sendingFacility.isEmpty()) {
 				IS sendingFacilityName = sendingFacility.getHd1_NamespaceID();
@@ -474,6 +490,13 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				}
 			}
 
+			if (!receivingFacility.isEmpty()) {
+				ST receivingFacilityST = receivingFacility.getHd2_UniversalID();
+				if (!receivingFacilityST.isEmpty()) {
+					setReceivingFacilityName(receivingFacilityST.getValue());
+				}
+			}
+			
 			// messageheader.event from MSH9.2. MSH9.2 is triggering event.
 			// For ELR, it's R01. We need to map this to FHIR message-event, which
 			// can be observation-provide.

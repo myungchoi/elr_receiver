@@ -39,6 +39,7 @@ public class ELRReceiver {
 	static String default_port = "8888";
 	static String default_phcr_controller_api_url = "http://localhost:8888/ECR";
 	static String default_fhir_controller_api_url = "http://localhost:8080/fhir";
+	static String default_index_service_api_url = "htpp://localhost:9090/decedent-index";
 	static String default_receiver_parser_mode = "FHIR";
 	static boolean default_useTls = false;
 	static String default_useTls_str = "False";
@@ -60,6 +61,7 @@ public class ELRReceiver {
 		String ecrTemplateFileName = default_ecrTemplateFileName;
 		String transport = default_transport;
 		String httpAuth = default_httpAuth;
+		String indexServiceApiUrl = default_index_service_api_url;
 
 		boolean writeConfig = false;
 		try {
@@ -74,6 +76,7 @@ public class ELRReceiver {
 			ecrTemplateFileName = prop.getProperty("ecrFileName", default_ecrTemplateFileName);
 			transport = prop.getProperty("transport", default_transport);
 			httpAuth = prop.getProperty("HTTPAuth", default_httpAuth);
+			indexServiceApiUrl = prop.getProperty("indexServiceApiUrl", default_index_service_api_url);
 
 			if (prop.getProperty("useTls", default_useTls_str).equalsIgnoreCase("true")) {
 				useTls = true;
@@ -95,6 +98,7 @@ public class ELRReceiver {
 				prop.setProperty("ecrFileName", default_ecrTemplateFileName);
 				prop.setProperty("transport", default_transport);
 				prop.setProperty("HTTPAuth", default_httpAuth);
+				prop.setProperty("indexServiceApiUrl", default_index_service_api_url);
 				prop.store(output, null);
 			}
 		}
@@ -148,13 +152,13 @@ public class ELRReceiver {
 				HL7v2ReceiverFHIRApplication handler = new HL7v2ReceiverFHIRApplication();
 				server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
 				// Configure the Receiver App before we start.
-				handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName, null);
+				handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName, null, indexServiceApiUrl);
 			} else {
 				LOGGER.debug("Preparing for ECR parser");
 				HL7v2ReceiverECRApplication handler = new HL7v2ReceiverECRApplication();
 				server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
 				// Configure the Receiver App before we start.
-				handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName, null);
+				handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName, null, indexServiceApiUrl);
 			}
 			server.registerConnectionListener(new MyConnectionListener());
 			server.setExceptionHandler(new MyExceptionHandler());
@@ -176,14 +180,14 @@ public class ELRReceiver {
 
 				server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
 				// Configure the Receiver App before we start.
-				handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName, httpAuth);
+				handler.config(fhir_controller_api_url, useTls, qFileName, ecrTemplateFileName, httpAuth, indexServiceApiUrl);
 			} else {
 				HL7v2ReceiverECRApplication handler = new HL7v2ReceiverECRApplication();
 				((Hl7OverHttpLowerLayerProtocol) llp).setAuthorizationCallback(handler);
 
 				server.registerApplication("*", "*", (ReceivingApplication<Message>) handler);
 				// Configure the Receiver App before we start.
-				handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName, httpAuth);
+				handler.config(phcr_controller_api_url, useTls, qFileName, ecrTemplateFileName, httpAuth, indexServiceApiUrl);
 			}
 
 			server.registerConnectionListener(new MyConnectionListener());

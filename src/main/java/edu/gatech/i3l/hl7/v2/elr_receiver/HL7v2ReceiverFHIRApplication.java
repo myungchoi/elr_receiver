@@ -1,50 +1,31 @@
 package edu.gatech.i3l.hl7.v2.elr_receiver;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.sql.Timestamp;
+import java.util.Base64;
 import java.util.List;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import org.apache.log4j.Logger;
-import org.hl7.fhir.dstu3.model.BaseResource;
 import org.hl7.fhir.dstu3.model.Bundle;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.dstu3.model.Enumeration;
-import org.hl7.fhir.dstu3.model.MessageHeader;
-import org.hl7.fhir.dstu3.model.Observation;
+import org.hl7.fhir.dstu3.model.Bundle.BundleEntryResponseComponent;
+import org.hl7.fhir.dstu3.model.Enumerations.AdministrativeGender;
+import org.hl7.fhir.dstu3.model.HumanName;
+import org.hl7.fhir.dstu3.model.Identifier;
 import org.hl7.fhir.dstu3.model.Patient;
-import org.hl7.fhir.dstu3.model.codesystems.BundleType;
-import org.json.JSONArray;
-import org.json.JSONException;
+import org.hl7.fhir.dstu3.model.Resource;
+import org.hl7.fhir.dstu3.model.ResourceType;
+import org.hl7.fhir.dstu3.model.StringType;
 import org.json.JSONObject;
 
-import com.squareup.tape2.QueueFile;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.model.api.IFhirVersion;
-import ca.uhn.hl7v2.DefaultHapiContext;
+import ca.uhn.fhir.parser.IParser;
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
-import ca.uhn.hl7v2.model.v231.group.ORU_R01_ORCOBRNTEOBXNTECTI;
-import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI;
-import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
-import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
-import ca.uhn.hl7v2.protocol.ReceivingApplication;
-import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
 import ca.uhn.hl7v2.util.Terser;
-import edu.gatech.i3l.hl7.v2.parser.BaseHL7v2Parser;
-import edu.gatech.i3l.hl7.v2.parser.ecr.BaseHL7v2ECRParser;
-import edu.gatech.i3l.hl7.v2.parser.ecr.HL7v231ECRParser;
-import edu.gatech.i3l.hl7.v2.parser.ecr.HL7v251ECRParser;
 import edu.gatech.i3l.hl7.v2.parser.fhir.BaseHL7v2FHIRParser;
 import edu.gatech.i3l.hl7.v2.parser.fhir.HL7v23FhirStu3Parser;
 
@@ -139,12 +120,12 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 	private void sendFhir(JSONObject fhirJsonObject) 
 		throws Exception {
 
-		LOGGER.debug("FHIR Message submitted:"+fhirJsonObject.toString());
-
 		Client client = Client.create();
 		WebResource webResource = client.resource(getControllerApiUrl());
 		
 		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, fhirJsonObject.toString());
+		LOGGER.info("FHIR Message submitted:"+fhirJsonObject.toString());
+
 		if (response.getStatus() != 201 && response.getStatus() != 200) {
 			// Failed to write ECR. We should put this in the queue and retry.
 			LOGGER.error("Failed to talk to FHIR Controller for Message:\n"+fhirJsonObject.toString());
@@ -152,8 +133,97 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 			getQueueFile().add(fhirJsonObject.toString().getBytes());
 			throw new RuntimeException("Failed: HTTP error code : "+response.getStatus());
 		} else {
-			LOGGER.info("FHIR Message submitted:"+fhirJsonObject.toString());
-			System.out.println("FHIR Message submitted:"+fhirJsonObject.toString());
+			String indexServiceApiUrl = getIndexServiceApiUrl();
+			String indexServiceApiUrlEnv = System.getenv("PATIENT_INDEX_SERVER");
+			if (indexServiceApiUrlEnv == null) return;
+			else indexServiceApiUrl = indexServiceApiUrlEnv;
+			
+			String resp = response.getEntity(String.class);
+			IParser p = FhirContext.forDstu3().newJsonParser();
+			Bundle bundleResponse = p.parseResource(Bundle.class, resp);
+			if (bundleResponse == null) {
+				throw new RuntimeException("Failed: FHIR response error : "+resp);
+			} else {
+				List<BundleEntryComponent> entryList = bundleResponse.getEntry();
+				for (BundleEntryComponent entry : entryList) {
+					// We just check Patient id from location in response.
+					BundleEntryResponseComponent entryResponse = entry.getResponse();
+					if (entryResponse != null && !entryResponse.isEmpty()) {
+						String location = entryResponse.getLocation();
+						if (location != null && !location.isEmpty()) {
+							if (location.contains("Patient")) {
+								String[] path = location.split("/");
+								String id = path[path.length-1];
+								
+								Bundle messageFhir = p.parseResource(Bundle.class, fhirJsonObject.toString());
+								List<BundleEntryComponent> messageEntryList = messageFhir.getEntry();
+								boolean done = false;
+								for (BundleEntryComponent messageEntry : messageEntryList) {
+									Resource resource = messageEntry.getResource();
+									if (resource != null && !resource.isEmpty()) {
+										if (resource.getResourceType() == ResourceType.Patient) {
+											Identifier identifier = ((Patient)resource).getIdentifierFirstRep();
+											String caseNumber = null;
+											if (identifier != null && !identifier.isEmpty()) {
+												caseNumber = identifier.getValue();
+												System.out.println("Patient ID = "+id+", caseNumber:"+caseNumber);
+												if (caseNumber != null && !caseNumber.isEmpty()) {
+													StringType firstName = new StringType();
+													String lastName = new String();
+													HumanName name = ((Patient)resource).getNameFirstRep();
+													if (name != null && !name.isEmpty()) {
+														List<StringType> given = name.getGiven();
+														if (!given.isEmpty()) {
+															firstName = given.get(0);
+														}
+														lastName = name.getFamily();
+													}
+													AdministrativeGender genderFhir = ((Patient)resource).getGender();
+													String gender = "";
+													if (genderFhir != null) {
+														gender = genderFhir.toString();
+													}
+													// construct index info.
+													String indexInfo = "{\n" + 
+															"  \"firstName\": \""+firstName.getValue()+"\",\n" + 
+															"  \"gender\": \""+gender+"\",\n" + 
+															"  \"lastName\": \""+lastName+"\",\n" + 
+															"  \"listOfFhirSources\": [\n" + 
+															"    {\n" + 
+															"      \"fhirPatientId\": \""+id+"\",\n" + 
+															"      \"fhirServerUrl\": \""+getControllerApiUrl().replace("/$process-message", "")+"\",\n" + 
+															"      \"fhirVersion\": \"STU3\",\n" + 
+															"      \"type\": \"LAB\"\n" + 
+															"    }\n" + 
+															"  ],\n" + 
+															"  \"meCaseNumber\": \""+caseNumber+"\",\n" + 
+															"  \"meOffice\": \""+getMyParser().getReceivingFacilityName()+"\"\n" + 
+															"}";
+													LOGGER.info("Index register:"+indexInfo);
+													webResource = client.resource(indexServiceApiUrl+"/manage");
+													String user = System.getenv("INDEX_SERVER_USER");
+													if (user == null) user = "decedent";
+													String pw = System.getenv("INDEX_SERVER_PASSWORD");
+													if (pw == null) pw = "password";
+													byte[] auth = (user+":"+pw).getBytes(StandardCharsets.UTF_8);
+													String encoded = Base64.getEncoder().encodeToString(auth);
+													response = webResource.type("application/json").header("Authorization", "Basic "+encoded).post(ClientResponse.class, indexInfo);
+													if (response.getStatus() != 200 && response.getStatus() != 201) {
+														LOGGER.error("Index Service Registration Failed for "+indexServiceApiUrl+"/manage with "+response.getStatus());
+													}														
+												}
+												done = true;
+												break;
+											}
+										}
+									}
+								}
+								if (done) break;
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 

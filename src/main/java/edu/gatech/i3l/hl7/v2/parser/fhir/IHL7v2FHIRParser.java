@@ -10,4 +10,5 @@ import ca.uhn.hl7v2.model.Message;
 public interface IHL7v2FHIRParser {
 	public List<Bundle> executeParser(Message msg);
 	public MessageHeader getMessageHeader();
+	public String getReceivingFacilityName();
 }
