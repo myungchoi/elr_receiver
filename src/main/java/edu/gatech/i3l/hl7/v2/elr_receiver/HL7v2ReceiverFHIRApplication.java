@@ -210,7 +210,8 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 													response = webResource.type("application/json").header("Authorization", "Basic "+encoded).post(ClientResponse.class, indexInfo);
 													if (response.getStatus() != 200 && response.getStatus() != 201) {
 														LOGGER.error("Index Service Registration Failed for "+indexServiceApiUrl+"/manage with "+response.getStatus());
-													}														
+													}
+													LOGGER.info("Decedent Index submitted to: "+indexServiceApiUrl+"/manage");
 												}
 												done = true;
 												break;
