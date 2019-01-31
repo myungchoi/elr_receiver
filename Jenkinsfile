@@ -10,7 +10,7 @@ pipeline{
                 script{
                     docker.withRegistry('https://gt-build.hdap.gatech.edu'){
                         //Build and push the database image
-                        def elrReceiverImage = docker.build("pacerelrreceiver:1.0", "-f ./Dockerfile .")
+                        def elrReceiverImage = docker.build("elrreceiver:1.0", "-f ./Dockerfile .")
                         elrReceiverImage.push('latest')
                     }
                 }
@@ -21,8 +21,8 @@ pipeline{
         stage('Notify'){
             steps{
                 script{
-                    rancher confirm: true, credentialId: 'gt-rancher-server', endpoint: 'https://gt-rancher.hdap.gatech.edu/v2-beta', environmentId: '1a7', environments: '', image: 'gt-build.hdap.gatech.edu/pacerelrreceiver:latest', ports: '', service: 'PACER/elr-receiver', timeout: 60
-                    rancher confirm: true, credentialId: 'gt-rancher-server', endpoint: 'https://gt-rancher.hdap.gatech.edu/v2-beta', environmentId: '1a7', environments: '', image: 'gt-build.hdap.gatech.edu/pacerelrreceiver:latest', ports: '', service: 'MortalityReporting/elr-receiver', timeout: 60
+                    rancher confirm: true, credentialId: 'gt-rancher-server', endpoint: 'https://gt-rancher.hdap.gatech.edu/v2-beta', environmentId: '1a7', environments: '', image: 'gt-build.hdap.gatech.edu/elrreceiver:latest', ports: '', service: 'PACER/elr-receiver', timeout: 60
+                    rancher confirm: true, credentialId: 'gt-rancher-server', endpoint: 'https://gt-rancher.hdap.gatech.edu/v2-beta', environmentId: '1a7', environments: '', image: 'gt-build.hdap.gatech.edu/elrreceiver:latest', ports: '', service: 'MortalityReporting/elr-receiver', timeout: 60
                 }
             }
         }

@@ -268,6 +268,12 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				for (int j = 0; j < totalNumberOfObservation; j++) {
 					Observation observation = new Observation();
 
+					CodeableConcept typeConcept = new CodeableConcept();
+					// This is Lab result
+					Coding typeCoding = new Coding("http://hl7.org/fhir/observation-category", "laboratory", "");
+					typeConcept.addCoding(typeCoding);
+					observation.addCategory(typeConcept);
+
 					ORU_R01_OBSERVATION hl7Observation = orderObservation.getOBSERVATION(j);
 
 					// Set the subject from the patient ID.
