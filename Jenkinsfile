@@ -14,6 +14,13 @@ pipeline{
                         elrReceiverImage.push('latest')
                     }
                 }
+                script{
+                    docker.withRegistry('https://797827902844.dkr.ecr.us-east-2.amazonaws.com', 'ecr:us-east-2:open-mdi-credential'){
+                        //Build and push the database image
+                        def openMdiImage = docker.build("om-java-ms-gtri-elr-receiver:1.0", "-f ./Dockerfile .")
+                        openMdiImage.push('latest')
+                    }
+                }
             }
         }
 
