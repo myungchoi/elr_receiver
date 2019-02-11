@@ -11,6 +11,8 @@ import org.hl7.fhir.dstu3.model.Bundle.BundleEntryResponseComponent;
 import org.hl7.fhir.dstu3.model.Enumerations.AdministrativeGender;
 import org.hl7.fhir.dstu3.model.HumanName;
 import org.hl7.fhir.dstu3.model.Identifier;
+import org.hl7.fhir.dstu3.model.MessageHeader;
+import org.hl7.fhir.dstu3.model.MessageHeader.MessageDestinationComponent;
 import org.hl7.fhir.dstu3.model.Patient;
 import org.hl7.fhir.dstu3.model.Resource;
 import org.hl7.fhir.dstu3.model.ResourceType;
@@ -122,7 +124,33 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 
 		Client client = Client.create();
 		WebResource webResource = client.resource(getControllerApiUrl());
-		
+		IParser p = FhirContext.forDstu3().newJsonParser();
+
+		String meOffice;
+		if (getMyParser() == null || getMyParser().getReceivingFacilityName() == null) {
+			// Get meOffice from destination in FHIR.
+			Bundle bundleMessage = p.parseResource(Bundle.class, fhirJsonObject.toString());
+			List<BundleEntryComponent> messageEntryList = bundleMessage.getEntry();
+			BundleEntryComponent messageHeaderEntry = messageEntryList.get(0);
+			Resource messageHeader = messageHeaderEntry.getResource();
+			if (messageHeader.getResourceType() != ResourceType.MessageHeader) {
+				// This is a bug... we should have a header. 
+				LOGGER.error("Message Bundler withoug MessageHeader. Message ignored");
+				return;
+			}
+			List<MessageDestinationComponent> destinations = ((MessageHeader)messageHeader).getDestination();
+			if (destinations.size() > 0) {
+				meOffice = destinations.get(0).getName();
+				if (meOffice == null || meOffice.isEmpty()) {
+					meOffice = destinations.get(0).getEndpoint();
+				}
+			} else {
+				meOffice = "NOT_SPECIFIED";
+			}
+		} else {
+			meOffice = getMyParser().getReceivingFacilityName();
+		}
+
 		ClientResponse response = webResource.type("application/json").post(ClientResponse.class, fhirJsonObject.toString());
 		LOGGER.info("FHIR Message submitted:"+fhirJsonObject.toString());
 
@@ -139,7 +167,6 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 			else indexServiceApiUrl = indexServiceApiUrlEnv;
 			
 			String resp = response.getEntity(String.class);
-			IParser p = FhirContext.forDstu3().newJsonParser();
 			Bundle bundleResponse = p.parseResource(Bundle.class, resp);
 			if (bundleResponse == null) {
 				throw new RuntimeException("Failed: FHIR response error : "+resp);
@@ -158,6 +185,7 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 								Bundle messageFhir = p.parseResource(Bundle.class, fhirJsonObject.toString());
 								List<BundleEntryComponent> messageEntryList = messageFhir.getEntry();
 								boolean done = false;
+								
 								for (BundleEntryComponent messageEntry : messageEntryList) {
 									Resource resource = messageEntry.getResource();
 									if (resource != null && !resource.isEmpty()) {
@@ -183,6 +211,7 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 													if (genderFhir != null) {
 														gender = genderFhir.toString();
 													}
+													
 													// construct index info.
 													String indexInfo = "{\n" + 
 															"  \"firstName\": \""+firstName.getValue()+"\",\n" + 
@@ -197,7 +226,7 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 															"    }\n" + 
 															"  ],\n" + 
 															"  \"meCaseNumber\": \""+caseNumber+"\",\n" + 
-															"  \"meOffice\": \""+getMyParser().getReceivingFacilityName()+"\"\n" + 
+															"  \"meOffice\": \""+meOffice+"\"\n" + 
 															"}";
 													LOGGER.info("Index register:"+indexInfo);
 													webResource = client.resource(indexServiceApiUrl+"/manage");
