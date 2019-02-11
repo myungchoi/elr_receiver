@@ -80,11 +80,11 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 	public void setSendingFacilityName(String sendingFacilityName) {
 		this.sendingFacilityName = sendingFacilityName;
 	}
-	
+
 	public String getReceivingFacilityName() {
 		return this.receivingFacilityName;
 	}
-	
+
 	public void setReceivingFacilityName(String receivingFacilityName) {
 		this.receivingFacilityName = receivingFacilityName;
 	}
@@ -158,7 +158,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			ca.uhn.hl7v2.model.v23.segment.PID pid = patientHL7.getPID();
 
 			patient.setId(UUID.randomUUID().toString());
-			
+
 			// PID-2 to patient ID.
 			// This is the accession number of NMS' client.
 			CX pid2 = pid.getPid2_PatientIDExternalID();
@@ -264,10 +264,25 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				ORU_R01_ORDER_OBSERVATION orderObservation = response.getORDER_OBSERVATION(i);
 				OBR obr = orderObservation.getOBR();
 
+				CE obr4 = obr.getObr4_UniversalServiceIdentifier();
+				String serviceDesc = null;
+				if (obr4 != null && !obr4.isEmpty()) {
+					ST serviceDescST = obr4.getCe2_Text();
+					if (serviceDescST != null && !serviceDescST.isEmpty()) {
+						serviceDesc = serviceDescST.getValue();
+					}
+				}
+				
 				int totalNumberOfObservation = orderObservation.getOBSERVATIONReps();
 				for (int j = 0; j < totalNumberOfObservation; j++) {
 					Observation observation = new Observation();
 
+					if (serviceDesc != null) {
+						Identifier identifier = new Identifier();
+						identifier.setValue(serviceDesc);
+						observation.addIdentifier(identifier);
+					}
+					
 					CodeableConcept typeConcept = new CodeableConcept();
 					// This is Lab result
 					Coding typeCoding = new Coding("http://hl7.org/fhir/observation-category", "laboratory", "");
@@ -292,14 +307,14 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 					if (!unit.isEmpty()) {
 						ID id = unit.getCe1_Identifier();
 						if (id != null && !id.isEmpty()) {
-							unitString = id.getValue().replace("mcg", "ug").replace(" Creat" , "{creat}");
-							unitCodeString = id.getValue().replace("mcg", "ug").replace(" Creat" , "{creat}");
+							unitString = id.getValue().replace("mcg", "ug").replace(" Creat", "{creat}");
+							unitCodeString = id.getValue().replace("mcg", "ug").replace(" Creat", "{creat}");
 						}
 
 						ST system = unit.getCe3_NameOfCodingSystem();
 						if (system != null && !system.isEmpty()) {
 							unitSystemString = system.getValue();
-						} 
+						}
 					}
 
 					// Value Type for observation.value[x] and observation.referenceRange
@@ -403,10 +418,19 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 							for (int n = 0; n < totalNumberOfNTEComment; n++) {
 								FT nte3 = nte.getNte3_Comment(n);
 								if (nte3 != null && !nte3.isEmpty()) {
-									if (comments == null) {
-										comments = nte3.getValue();
+									ID nte2 = nte.getNte2_SourceOfComment();
+									if (!nte2.isEmpty() && "METHOD".equalsIgnoreCase(nte2.getValue())) {
+										// NMS specific. We put this in method element in
+										// FHIR.
+										CodeableConcept methodCodeableConcept = new CodeableConcept();
+										methodCodeableConcept.setText(nte3.getValue());
+										observation.setMethod(methodCodeableConcept);
 									} else {
-										comments = comments.concat(". " + nte3.getValue());
+										if (comments == null) {
+											comments = nte3.getValue();
+										} else {
+											comments = comments.concat(". " + nte3.getValue());
+										}
 									}
 								}
 							}
@@ -487,7 +511,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			messageHeader = new MessageHeader();
 
 		HD sendingFacility = msh.getSendingFacility();
-		HD receivingFacility = msh.getReceivingFacility();
+//		HD receivingFacility = msh.getReceivingFacility();
 		try {
 			if (!sendingFacility.isEmpty()) {
 				IS sendingFacilityName = sendingFacility.getHd1_NamespaceID();
@@ -496,13 +520,13 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				}
 			}
 
-			if (!receivingFacility.isEmpty()) {
-				ST receivingFacilityST = receivingFacility.getHd2_UniversalID();
-				if (!receivingFacilityST.isEmpty()) {
-					setReceivingFacilityName(receivingFacilityST.getValue());
-				}
-			}
-			
+//			if (!receivingFacility.isEmpty()) {
+//				ST receivingFacilityST = receivingFacility.getHd2_UniversalID();
+//				if (!receivingFacilityST.isEmpty()) {
+//					setReceivingFacilityName(receivingFacilityST.getValue());
+//				}
+//			}
+
 			// messageheader.event from MSH9.2. MSH9.2 is triggering event.
 			// For ELR, it's R01. We need to map this to FHIR message-event, which
 			// can be observation-provide.
@@ -544,7 +568,8 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			HD msh6 = msh.getMsh6_ReceivingFacility();
 			String destinationEndpoint = getValueOfHD(msh6);
 			if (destinationEndpoint != null && !destinationEndpoint.isEmpty()) {
-				messageDestination.setEndpoint(destinationEndpoint);
+				messageDestination.setName(destinationEndpoint);
+				setReceivingFacilityName(destinationEndpoint);
 			}
 
 			if (!messageDestination.isEmpty()) {
