@@ -264,7 +264,7 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 		Long id_num = (Long) (timestamp.getTime()/10000);
 		ecrJson.put("id", id_num.toString());
 		
-		LOGGER.debug("Sending: "+ecrJson.toString());
+		LOGGER.debug("Sending to getControllerApiUrl(): "+ecrJson.toString());
 		Client client = Client.create();
 		WebResource webResource = client.resource(getControllerApiUrl());
 		
