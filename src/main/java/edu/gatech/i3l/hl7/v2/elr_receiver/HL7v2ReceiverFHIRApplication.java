@@ -4,6 +4,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 
+import javax.ws.rs.core.MediaType;
+
 import org.apache.log4j.Logger;
 import org.hl7.fhir.dstu3.model.Bundle;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryComponent;
@@ -117,6 +119,52 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 		}
 		
 		return ErrorCode.NOERROR;
+	}
+	
+	private void sendFhirToOpenMdi(String Url, JSONObject fhirJson, String meOffice) {
+		String openMdiClienId = System.getenv("OPENMDI_DOC_API_CLIENT_ID");
+		String openMdiClientSecret = System.getenv("OPENMDI_DOC_API_CLIENT_SECRET");
+		String meOfficeMDI = meOffice.replace(" ", "_").replaceAll("/", "_");
+		// First, we need to get authorization.
+		
+		byte[] auth = (openMdiClienId+":"+openMdiClientSecret).getBytes(StandardCharsets.UTF_8);
+		String encoded = Base64.getEncoder().encodeToString(auth);
+		
+		Client client = Client.create();
+		WebResource webResource = client.resource(Url);
+		ClientResponse response = webResource
+				.type(MediaType.APPLICATION_FORM_URLENCODED)
+				.accept(MediaType.APPLICATION_JSON)
+				.header("Cache-Control", "no-cache")
+				.header("Authorization", "Basic "+encoded)
+				.post(ClientResponse.class, "grant_type=client_credentials&scope=openmdi");
+		
+		if (response.getStatus() != 200 && response.getStatus() != 201) {
+			LOGGER.error("Failed to obtain token from OpenMDI for this credential");
+			return;
+		}
+		
+		String responseEntity = response.getEntity(String.class);
+		JSONObject responseJson = new JSONObject(responseEntity);
+		String access_token = responseJson.getString("access_token");
+		if (access_token == null || access_token.isEmpty()) {
+			LOGGER.error("Access token received fro OpenMDI is nll or empty");
+		}
+		
+		String token_type = responseJson.getString("token_type");
+		if (token_type == null || token_type.isEmpty()) {
+			token_type = "Bearer";
+		}
+		
+		response = webResource
+				.type("application/fhir+json")
+				.accept(MediaType.APPLICATION_JSON)
+				.header("Authorization", token_type+" "+access_token)
+				.post(ClientResponse.class, fhirJson.toString());
+		
+		if (response.getStatus() != 200 && response.getStatus() != 201) {
+			LOGGER.error("POSTING FHIR data to OpenMDI failed");
+		}
 	}
 	
 	private void sendFhir(JSONObject fhirJsonObject) 
@@ -253,6 +301,14 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 						}
 					}
 				}
+			}
+			
+			// FHIR data submitted to our internal FHIR server.
+			// Now, we submit this to OpenMDI if requred.
+			String openMdiUrl = System.getenv("OPENMDI_DOC_API_URL");
+			if (openMdiUrl != null && !openMdiUrl.isEmpty()) {
+				// Now, we need to send this FHIR data to OpenMdi.
+				sendFhirToOpenMdi(openMdiUrl, fhirJsonObject, meOffice);
 			}
 		}
 	}
