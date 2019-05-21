@@ -210,6 +210,10 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 			HttpHeaders headers = new HttpHeaders();
 			headers.setContentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA);
 			headers.setAccept(Collections.singletonList(org.springframework.http.MediaType.ALL));
+			headers.add("Authorization", tokenType + " " + accessToken);
+			
+			LOGGER.debug("Sending to "+dataUrl);
+			LOGGER.debug(headers);
 
 			HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity = new HttpEntity<>(map, headers);
 
