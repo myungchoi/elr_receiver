@@ -202,85 +202,85 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 			expireSeconds = currentSeconds + expiresIn - 1;
 		}
 
-		LinkedMultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
-		InputStream inputStream = new ByteArrayInputStream(fhirJson.toString().getBytes());
-		try {
-			map.add("file", new FileMessageResource("temp.json", inputStream));
-
-			HttpHeaders headers = new HttpHeaders();
-			headers.setContentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA);
-			headers.setAccept(Collections.singletonList(org.springframework.http.MediaType.ALL));
-			headers.add("Authorization", tokenType + " " + accessToken);
-			
-			LOGGER.debug("Sending to "+dataUrl);
-			LOGGER.debug(headers);
-
-			HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity = new HttpEntity<>(map, headers);
-
-			RestTemplate restTemplate = new RestTemplate();
-			ResponseEntity<String> restResponse = restTemplate.exchange(dataUrl,
-					org.springframework.http.HttpMethod.POST, requestEntity, String.class);
-			if (restResponse.getStatusCode() != HttpStatus.OK && restResponse.getStatusCode() != HttpStatus.CREATED) {
-				LOGGER.error("POSTING FHIR data to " + dataUrl + " failed");
-				LOGGER.error(restResponse.getBody());
-			} else {
-				LOGGER.debug("FHIR Data Submitted to OpenMDI\n" + restResponse.getBody());
-			}
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			LOGGER.error(e.getMessage());
-		}
-
-//		// OpenMDI ONLY support file upload. So, save the fhir data to file
-//		FileWriter file = null;
+//		LinkedMultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+//		InputStream inputStream = new ByteArrayInputStream(fhirJson.toString().getBytes());
 //		try {
-//			file = new FileWriter("temp.json");
-//			file.write(fhirJson.toString());
-//			file.flush();
+//			map.add("file", new FileMessageResource("temp.json", inputStream));
+//
+//			HttpHeaders headers = new HttpHeaders();
+//			headers.setContentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA);
+//			headers.setAccept(Collections.singletonList(org.springframework.http.MediaType.ALL));
+//			headers.add("Authorization", tokenType + " " + accessToken);
+//			
+//			LOGGER.debug("Sending to "+dataUrl);
+//			LOGGER.debug(headers);
+//
+//			HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity = new HttpEntity<>(map, headers);
+//
+//			RestTemplate restTemplate = new RestTemplate();
+//			ResponseEntity<String> restResponse = restTemplate.exchange(dataUrl,
+//					org.springframework.http.HttpMethod.POST, requestEntity, String.class);
+//			if (restResponse.getStatusCode() != HttpStatus.OK && restResponse.getStatusCode() != HttpStatus.CREATED) {
+//				LOGGER.error("POSTING FHIR data to " + dataUrl + " failed");
+//				LOGGER.error(restResponse.getBody());
+//			} else {
+//				LOGGER.debug("FHIR Data Submitted to OpenMDI\n" + restResponse.getBody());
+//			}
 //		} catch (IOException e) {
 //			// TODO Auto-generated catch block
 //			e.printStackTrace();
+//			LOGGER.error(e.getMessage());
 //		}
-//
-//		// We should have access token now.
-//		webResource = client.resource(dataUrl);
-//		FormDataMultiPart multipartEntity = new FormDataMultiPart();
-//
-////		StreamDataBodyPart bodyPart = new StreamDataBodyPart();
-////		bodyPart.setName("asset");
-////		InputStream inputStream = new ByteArrayInputStream(fhirJson.toString().getBytes());
-////		bodyPart.setStreamEntity(inputStream);
-////		FormDataBodyPart bodyPart = new FormDataBodyPart("asset", fhirJson.toString());
-//		FileDataBodyPart bodyPart = new FileDataBodyPart("asset", new File("temp.json"),
-//				new MediaType("application", "fhir+json"));
-//		multipartEntity.bodyPart(bodyPart);
-//
-////		bodyPart.setMediaType(new MediaType("application", "fhir+json"));
-////		ContentDisposition cd = bodyPart.getContentDisposition();
-//
-////		byte[] data = fhirJson.toString().getBytes();
-////		multipartEntity.bodyPart(new FormDataBodyPart("asset", data, MediaType.APPLICATION_OCTET_STREAM_TYPE));
-//
-//		response = webResource.type(MediaType.MULTIPART_FORM_DATA_TYPE).accept(MediaType.APPLICATION_JSON)
-//				.header("Authorization", tokenType + " " + accessToken).post(ClientResponse.class, multipartEntity);
-//
-//		if (response.getStatus() != 200 && response.getStatus() != 201) {
-//			LOGGER.error("POSTING FHIR data to " + webResource.toString() + " failed");
-//			LOGGER.error(response.getStatusInfo());
-//		} else {
-//			LOGGER.debug("FHIR Data Submitted to OpenMDI\n" + response.getEntity(String.class));
-//		}
-//		
-//		if (file != null) {
-//			try {
-//				file.flush();
-//				file.close();
-//			} catch (IOException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace();
-//			}
-//		}
+
+		// OpenMDI ONLY support file upload. So, save the fhir data to file
+		FileWriter file = null;
+		try {
+			file = new FileWriter("temp.json");
+			file.write(fhirJson.toString());
+			file.flush();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		// We should have access token now.
+		webResource = client.resource(dataUrl);
+		FormDataMultiPart multipartEntity = new FormDataMultiPart();
+
+//		StreamDataBodyPart bodyPart = new StreamDataBodyPart();
+//		bodyPart.setName("asset");
+//		InputStream inputStream = new ByteArrayInputStream(fhirJson.toString().getBytes());
+//		bodyPart.setStreamEntity(inputStream);
+//		FormDataBodyPart bodyPart = new FormDataBodyPart("asset", fhirJson.toString());
+		FileDataBodyPart bodyPart = new FileDataBodyPart("asset", new File("temp.json"),
+				new MediaType("application", "fhir+json"));
+		multipartEntity.bodyPart(bodyPart);
+
+//		bodyPart.setMediaType(new MediaType("application", "fhir+json"));
+//		ContentDisposition cd = bodyPart.getContentDisposition();
+
+//		byte[] data = fhirJson.toString().getBytes();
+//		multipartEntity.bodyPart(new FormDataBodyPart("asset", data, MediaType.APPLICATION_OCTET_STREAM_TYPE));
+
+		response = webResource.type(MediaType.MULTIPART_FORM_DATA_TYPE).accept(MediaType.APPLICATION_JSON)
+				.header("Authorization", tokenType + " " + accessToken).post(ClientResponse.class, multipartEntity);
+
+		if (response.getStatus() != 200 && response.getStatus() != 201) {
+			LOGGER.error("POSTING FHIR data to " + webResource.toString() + " failed");
+			LOGGER.error(response.getStatusInfo());
+		} else {
+			LOGGER.debug("FHIR Data Submitted to OpenMDI\n" + response.getEntity(String.class));
+		}
+		
+		if (file != null) {
+			try {
+				file.flush();
+				file.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 	}
 
 	private void sendFhir(JSONObject fhirJsonObject) throws Exception {
