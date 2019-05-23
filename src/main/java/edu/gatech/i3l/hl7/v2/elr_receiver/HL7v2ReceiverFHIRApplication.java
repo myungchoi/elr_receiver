@@ -30,9 +30,12 @@ import org.json.JSONObject;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.config.ClientConfig;
+import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.multipart.FormDataMultiPart;
 import com.sun.jersey.multipart.file.FileDataBodyPart;
 import com.sun.jersey.multipart.file.StreamDataBodyPart;
+import com.sun.jersey.multipart.impl.MultiPartWriter;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
@@ -235,6 +238,11 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 //		}
 
 		// We should have access token now.
+		
+		ClientConfig cc = new DefaultClientConfig();
+		cc.getClasses().add(MultiPartWriter.class);
+		client = Client.create(cc);
+		
 		webResource = client.resource(dataUrl);
 		FormDataMultiPart multipartEntity = new FormDataMultiPart();
 
