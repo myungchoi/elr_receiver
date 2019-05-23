@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 RUN mvn clean install
 
 #Build the Java container
-FROM openjdk:11-alpine
+FROM openjdk:latest-alpine
 
 # Copy elr_receiver jar file to webapps.
 COPY --from=builder /usr/src/app/config.properties /usr/src/myapp/config.properties
