@@ -1,8 +1,10 @@
 package edu.gatech.i3l.hl7.v2.elr_receiver;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -30,6 +32,7 @@ import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.multipart.FormDataMultiPart;
 import com.sun.jersey.multipart.file.FileDataBodyPart;
+import com.sun.jersey.multipart.file.StreamDataBodyPart;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
@@ -221,30 +224,31 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 //		}
 
 		// OpenMDI ONLY support file upload. So, save the fhir data to file
-		FileWriter file = null;
-		try {
-			file = new FileWriter("temp.json");
-			file.write(fhirJson.toString());
-			file.flush();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+//		FileWriter file = null;
+//		try {
+//			file = new FileWriter("temp.json");
+//			file.write(fhirJson.toString());
+//			file.flush();
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
 
 		// We should have access token now.
 		webResource = client.resource(dataUrl);
 		FormDataMultiPart multipartEntity = new FormDataMultiPart();
 
-//		StreamDataBodyPart bodyPart = new StreamDataBodyPart();
-//		bodyPart.setName("asset");
-//		InputStream inputStream = new ByteArrayInputStream(fhirJson.toString().getBytes());
-//		bodyPart.setStreamEntity(inputStream);
-//		FormDataBodyPart bodyPart = new FormDataBodyPart("asset", fhirJson.toString());
-		FileDataBodyPart bodyPart = new FileDataBodyPart("asset", new File("temp.json"),
-				new MediaType("application", "fhir+json"));
-		multipartEntity.bodyPart(bodyPart);
+		StreamDataBodyPart bodyPart = new StreamDataBodyPart();
+		bodyPart.setName("asset");
+		bodyPart.setFilename("tempStream.json");
+		InputStream inputStream = new ByteArrayInputStream(fhirJson.toString().getBytes());
+		bodyPart.setStreamEntity(inputStream);
+//		FormDataBodyPart bodyPart = new FormDataBodyPart("asset", fhirJson.toString(),
+//		FileDataBodyPart bodyPart = new FileDataBodyPart("asset", new File("temp.json"),
+//				new MediaType("application", "fhir+json"));
 
-//		bodyPart.setMediaType(new MediaType("application", "fhir+json"));
+		bodyPart.setMediaType(new MediaType("application", "fhir+json"));
+		multipartEntity.bodyPart(bodyPart);
 //		ContentDisposition cd = bodyPart.getContentDisposition();
 
 //		byte[] data = fhirJson.toString().getBytes();
@@ -260,15 +264,15 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 			LOGGER.debug("FHIR Data Submitted to OpenMDI\n" + response.getEntity(String.class));
 		}
 		
-		if (file != null) {
-			try {
-				file.flush();
-				file.close();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
+//		if (file != null) {
+//			try {
+//				file.flush();
+//				file.close();
+//			} catch (IOException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+//		}
 	}
 
 	private void sendFhir(JSONObject fhirJsonObject) throws Exception {
