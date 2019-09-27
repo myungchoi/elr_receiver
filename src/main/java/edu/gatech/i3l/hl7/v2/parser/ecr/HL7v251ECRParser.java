@@ -422,10 +422,11 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 		
 		if (ok_to_put) ecr_laborder_json.put("Provider", provider_json);		
 		
-//		// Observation Time
+		// Observation Requested Time
 //		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
-//		if (observationTime != null && !observationTime.isEmpty())
-//			ecr_laborder_json.put("DateTime", observationTime);
+		String observationRequestedTime = orderRequest.getRequestedDateTime().getTime().getValue();
+		if (observationRequestedTime != null && !observationRequestedTime.isEmpty())
+			ecr_laborder_json.put("Date", observationRequestedTime);
 		
 		// Reason for Study		
 		JSONArray reasons_json = new JSONArray();
@@ -563,12 +564,16 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 		}
 		
 		// Put date: Not required by ECR. But, putting the date anyway...
-		TS obxDate = obsResult.getDateTimeOfTheObservation();
-		if (obxDate != null) {
-			labresult_json.put("Date", obxDate.getTime().getValue());
+		TS obxObservationDate = obsResult.getDateTimeOfTheObservation();
+		TS obxEffectiveDate = obsResult.getEffectiveDateOfReferenceRangeValues();
+		TS obxAnalysisDate = obsResult.getDateTimeOfTheAnalysis();
+		if (obxObservationDate != null) {
+			labresult_json.put("Date", obxObservationDate.getTime().getValue());
+		} else if (obxEffectiveDate != null) {
+			labresult_json.put("Date", obxEffectiveDate.getTime().getValue());
+		} else if (obxAnalysisDate != null) {
+			labresult_json.put("Date", obxAnalysisDate.getTime().getValue());
 		}
-		
-		
 		
 		return labresult_json;
 	}
