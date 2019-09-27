@@ -564,15 +564,15 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 		}
 		
 		// Put date: Not required by ECR. But, putting the date anyway...
-		TS obxObservationDate = obsResult.getDateTimeOfTheObservation();
-		TS obxEffectiveDate = obsResult.getEffectiveDateOfReferenceRangeValues();
-		TS obxAnalysisDate = obsResult.getDateTimeOfTheAnalysis();
-		if (obxObservationDate != null) {
-			labresult_json.put("Date", obxObservationDate.getTime().getValue());
-		} else if (obxEffectiveDate != null) {
-			labresult_json.put("Date", obxEffectiveDate.getTime().getValue());
-		} else if (obxAnalysisDate != null) {
-			labresult_json.put("Date", obxAnalysisDate.getTime().getValue());
+		String obxObservationDate = obsResult.getDateTimeOfTheObservation().getTime().getValue();
+		String obxEffectiveDate = obsResult.getEffectiveDateOfReferenceRangeValues().getTime().getValue();
+		String obxAnalysisDate = obsResult.getDateTimeOfTheAnalysis().getTime().getValue();
+		if (obxObservationDate != null && !obxObservationDate.isEmpty()) {
+			labresult_json.put("Date", obxObservationDate);
+		} else if (obxEffectiveDate != null && !obxEffectiveDate.isEmpty()) {
+			labresult_json.put("Date", obxEffectiveDate);
+		} else if (obxAnalysisDate != null && !obxAnalysisDate.isEmpty()) {
+			labresult_json.put("Date", obxAnalysisDate);
 		}
 		
 		return labresult_json;
