@@ -1,11 +1,12 @@
 package edu.gatech.i3l.hl7.v2.parser.ecr;
 
-import org.apache.log4j.spi.LoggerFactory;
+import java.util.Date;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import ca.uhn.hl7v2.HL7Exception;
-import ca.uhn.hl7v2.model.Structure;
+import ca.uhn.hl7v2.model.DataTypeException;
 import ca.uhn.hl7v2.model.Varies;
 import ca.uhn.hl7v2.model.primitive.IS;
 import ca.uhn.hl7v2.model.v251.datatype.CE;
@@ -14,8 +15,6 @@ import ca.uhn.hl7v2.model.v251.datatype.FN;
 import ca.uhn.hl7v2.model.v251.datatype.HD;
 import ca.uhn.hl7v2.model.v251.datatype.ID;
 import ca.uhn.hl7v2.model.v251.datatype.PL;
-import ca.uhn.hl7v2.model.v251.datatype.SAD;
-import ca.uhn.hl7v2.model.v251.datatype.SI;
 import ca.uhn.hl7v2.model.v251.datatype.ST;
 import ca.uhn.hl7v2.model.v251.datatype.TS;
 import ca.uhn.hl7v2.model.v251.datatype.XAD;
@@ -26,7 +25,6 @@ import ca.uhn.hl7v2.model.v251.datatype.XTN;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
-import ca.uhn.hl7v2.model.v251.group.ORU_R01_SPECIMEN;
 import ca.uhn.hl7v2.model.v251.group.ORU_R01_VISIT;
 //import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
 import ca.uhn.hl7v2.model.v251.message.ORU_R01;
@@ -424,9 +422,13 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 		
 		// Observation Requested Time
 //		String observationTime = orderRequest.getObservationDateTime().getTime().getValue();
-		String observationRequestedTime = orderRequest.getRequestedDateTime().getTime().getValue();
-		if (observationRequestedTime != null && !observationRequestedTime.isEmpty())
+		Date observationRequestedTime;
+		try {
+			observationRequestedTime = orderRequest.getRequestedDateTime().getTime().getValueAsDate();
 			ecr_laborder_json.put("Date", observationRequestedTime);
+		} catch (DataTypeException e1) {
+			e1.printStackTrace();
+		}
 		
 		// Reason for Study		
 		JSONArray reasons_json = new JSONArray();
@@ -564,16 +566,35 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 		}
 		
 		// Put date: Not required by ECR. But, putting the date anyway...
-		String obxObservationDate = obsResult.getDateTimeOfTheObservation().getTime().getValue();
-		String obxEffectiveDate = obsResult.getEffectiveDateOfReferenceRangeValues().getTime().getValue();
-		String obxAnalysisDate = obsResult.getDateTimeOfTheAnalysis().getTime().getValue();
-		if (obxObservationDate != null && !obxObservationDate.isEmpty()) {
-			labresult_json.put("Date", obxObservationDate);
-		} else if (obxEffectiveDate != null && !obxEffectiveDate.isEmpty()) {
-			labresult_json.put("Date", obxEffectiveDate);
-		} else if (obxAnalysisDate != null && !obxAnalysisDate.isEmpty()) {
-			labresult_json.put("Date", obxAnalysisDate);
+		Date obxDate = null;
+		try {
+			obxDate = obsResult.getDateTimeOfTheObservation().getTime().getValueAsDate();
+		} catch (DataTypeException e) {
+			e.printStackTrace();
+			obxDate = null;
 		}
+		
+		if (obxDate == null) {
+			try {
+				obxDate = obsResult.getEffectiveDateOfReferenceRangeValues().getTime().getValueAsDate();
+			} catch (DataTypeException e) {
+				e.printStackTrace();
+				obxDate = null;
+			}			
+		} 
+
+		if (obxDate == null) {
+			try {
+				obxDate = obsResult.getDateTimeOfTheAnalysis().getTime().getValueAsDate();
+			} catch (DataTypeException e) {
+				e.printStackTrace();
+				obxDate = null;
+			}	
+		}	
+
+		if (obxDate != null) {
+			labresult_json.put("Date", obxDate);
+		} 
 		
 		return labresult_json;
 	}
