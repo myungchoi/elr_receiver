@@ -6,27 +6,29 @@ import java.util.List;
 import java.util.UUID;
 
 import org.apache.log4j.Logger;
-import org.hl7.fhir.dstu3.model.Bundle;
-import org.hl7.fhir.dstu3.model.CodeableConcept;
-import org.hl7.fhir.dstu3.model.Coding;
-import org.hl7.fhir.dstu3.model.DateTimeType;
-import org.hl7.fhir.dstu3.model.Enumerations.AdministrativeGender;
-import org.hl7.fhir.dstu3.model.Enumerations.MessageEvent;
-import org.hl7.fhir.dstu3.model.HumanName;
-import org.hl7.fhir.dstu3.model.Identifier;
-import org.hl7.fhir.dstu3.model.MessageHeader;
-import org.hl7.fhir.dstu3.model.MessageHeader.MessageDestinationComponent;
-import org.hl7.fhir.dstu3.model.MessageHeader.MessageSourceComponent;
-import org.hl7.fhir.dstu3.model.Observation;
-import org.hl7.fhir.dstu3.model.Observation.ObservationReferenceRangeComponent;
-import org.hl7.fhir.dstu3.model.Observation.ObservationStatus;
-import org.hl7.fhir.dstu3.model.Patient;
-import org.hl7.fhir.dstu3.model.Quantity;
-import org.hl7.fhir.dstu3.model.Reference;
-import org.hl7.fhir.dstu3.model.SimpleQuantity;
-import org.hl7.fhir.dstu3.model.StringType;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
-import org.hl7.fhir.dstu3.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.r4.model.Annotation;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.r4.model.CodeableConcept;
+import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.DateTimeType;
+import org.hl7.fhir.r4.model.Enumerations.AdministrativeGender;
+import org.hl7.fhir.r4.model.Enumerations.MessageEvent;
+import org.hl7.fhir.r4.model.HumanName;
+import org.hl7.fhir.r4.model.Identifier;
+import org.hl7.fhir.r4.model.MessageHeader;
+import org.hl7.fhir.r4.model.MessageHeader.MessageDestinationComponent;
+import org.hl7.fhir.r4.model.MessageHeader.MessageSourceComponent;
+import org.hl7.fhir.r4.model.Observation;
+import org.hl7.fhir.r4.model.Observation.ObservationReferenceRangeComponent;
+import org.hl7.fhir.r4.model.Observation.ObservationStatus;
+import org.hl7.fhir.r4.model.codesystems.ObservationCategory;
+import org.hl7.fhir.r4.model.Patient;
+import org.hl7.fhir.r4.model.Quantity;
+import org.hl7.fhir.r4.model.Reference;
+import org.hl7.fhir.r4.model.SimpleQuantity;
+import org.hl7.fhir.r4.model.StringType;
 
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
@@ -41,7 +43,6 @@ import ca.uhn.hl7v2.model.v23.datatype.IS;
 import ca.uhn.hl7v2.model.v23.datatype.NM;
 import ca.uhn.hl7v2.model.v23.datatype.ST;
 import ca.uhn.hl7v2.model.v23.datatype.TS;
-import ca.uhn.hl7v2.model.v23.datatype.TSComponentOne;
 import ca.uhn.hl7v2.model.v23.datatype.TX;
 import ca.uhn.hl7v2.model.v23.group.ORU_R01_OBSERVATION;
 import ca.uhn.hl7v2.model.v23.group.ORU_R01_ORDER_OBSERVATION;
@@ -52,19 +53,19 @@ import ca.uhn.hl7v2.model.v23.segment.NTE;
 import ca.uhn.hl7v2.model.v23.segment.OBR;
 import ca.uhn.hl7v2.model.v23.segment.OBX;
 
-public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
+public class HL7v23FhirR4Parser extends BaseHL7v2FHIRParser {
 	MessageHeader messageHeader = null;
 	String sendingFacilityName = null;
 	String receivingFacilityName = null;
 
 	// Logger setup
-	final static Logger LOGGER = Logger.getLogger(HL7v23FhirStu3Parser.class.getName());
+	final static Logger LOGGER = Logger.getLogger(HL7v23FhirR4Parser.class.getName());
 
 	private void initialize(Message msg) {
 		mapMessageHeader((ca.uhn.hl7v2.model.v23.message.ORU_R01) msg);
 	}
 
-	public HL7v23FhirStu3Parser() {
+	public HL7v23FhirR4Parser() {
 		setMyVersion("2.3");
 	}
 
@@ -118,6 +119,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				UUID uuid = UUID.randomUUID();
 				patientReference = "urn:uuid:" + uuid.toString();
 				bundleEntryPatient.setFullUrl(patientReference);
+				messageHeader.addFocus(new Reference(patientReference));
 				bundle.addEntry(bundleEntryPatient);
 			} else {
 				// We must have a patient.
@@ -135,6 +137,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 //				bundleEntryObservation.setRequest(bundleEntryRequest);
 				UUID uuid = UUID.randomUUID();
 				bundleEntryObservation.setFullUrl("urn:uuid:" + uuid.toString());
+				messageHeader.addFocus(new Reference("urn:uuid:" + uuid.toString()));
 				bundle.addEntry(bundleEntryObservation);
 			}
 
@@ -403,7 +406,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 					observation.setEffective(dateTimeType);
 
 					int totalNumberOfNTE = hl7Observation.getNTEReps();
-					String comments = null;
+					List<Annotation> annotations = new ArrayList<Annotation>();
 					for (int k = 0; k < totalNumberOfNTE; k++) {
 						// This is a comment. Observation can contain one comment.
 						// So we combine all the NTEs.
@@ -421,18 +424,16 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 										methodCodeableConcept.setText(nte3.getValue());
 										observation.setMethod(methodCodeableConcept);
 									} else {
-										if (comments == null) {
-											comments = nte3.getValue();
-										} else {
-											comments = comments.concat(". " + nte3.getValue());
-										}
+										Annotation annotation = new Annotation();
+										annotation.setText(nte3.getValue());
+										annotations.add(annotation);
 									}
 								}
 							}
 						}
 					}
-					if (comments != null) {
-						observation.setComment(comments);
+					if (annotations != null && !annotations.isEmpty()) {
+						observation.setNote(annotations);
 					}
 
 					retVal.add(observation);
@@ -531,10 +532,9 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 				ID msh9_2 = msh9.getCm_msg2_TriggerEvent();
 				if (msh9_2 != null && !msh9_2.isEmpty()) {
 					if (msh9_2.getValue().equals("R01")) {
-						MessageEvent messageEvent = MessageEvent.valueOf("OBSERVATIONPROVIDE");
-						eventCoding.setSystem(messageEvent.getSystem());
-						eventCoding.setCode(messageEvent.toCode());
-						eventCoding.setDisplay(messageEvent.getDisplay());
+						eventCoding.setSystem(ObservationCategory.LABORATORY.getSystem());
+						eventCoding.setCode(ObservationCategory.LABORATORY.toCode());
+						eventCoding.setDisplay(ObservationCategory.LABORATORY.getDisplay());
 					} else {
 						eventCoding.setCode(msh9_2.getValue());
 					}
@@ -572,13 +572,13 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 			}
 
 			// messageHeader.timestamp from MSH-7
-			TS msh7 = msh.getMsh7_DateTimeOfMessage();
-			if (msh7 != null && !msh7.isEmpty()) {
-				TSComponentOne timeOfEvent = msh7.getTs1_TimeOfAnEvent();
-				if (timeOfEvent != null && !timeOfEvent.isEmpty()) {
-					messageHeader.setTimestamp(timeOfEvent.getValueAsDate());
-				}
-			}
+//			TS msh7 = msh.getMsh7_DateTimeOfMessage();
+//			if (msh7 != null && !msh7.isEmpty()) {
+//				TSComponentOne timeOfEvent = msh7.getTs1_TimeOfAnEvent();
+//				if (timeOfEvent != null && !timeOfEvent.isEmpty()) {
+//					messageHeader.setTimestamp(timeOfEvent.getValueAsDate());
+//				}
+//			}
 
 			// messageHeader.source from MSH-3
 			HD msh3 = msh.getMsh3_SendingApplication();

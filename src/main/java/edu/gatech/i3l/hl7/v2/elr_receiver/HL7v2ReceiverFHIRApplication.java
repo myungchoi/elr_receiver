@@ -1,9 +1,6 @@
 package edu.gatech.i3l.hl7.v2.elr_receiver;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -25,6 +22,7 @@ import org.hl7.fhir.dstu3.model.Patient;
 import org.hl7.fhir.dstu3.model.Resource;
 import org.hl7.fhir.dstu3.model.ResourceType;
 import org.hl7.fhir.dstu3.model.StringType;
+import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.json.JSONObject;
 
 import com.sun.jersey.api.client.Client;
@@ -33,7 +31,6 @@ import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.config.ClientConfig;
 import com.sun.jersey.api.client.config.DefaultClientConfig;
 import com.sun.jersey.multipart.FormDataMultiPart;
-import com.sun.jersey.multipart.file.FileDataBodyPart;
 import com.sun.jersey.multipart.file.StreamDataBodyPart;
 import com.sun.jersey.multipart.impl.MultiPartWriter;
 
@@ -43,6 +40,7 @@ import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.Message;
 import ca.uhn.hl7v2.util.Terser;
 import edu.gatech.i3l.hl7.v2.parser.fhir.BaseHL7v2FHIRParser;
+import edu.gatech.i3l.hl7.v2.parser.fhir.HL7v23FhirR4Parser;
 import edu.gatech.i3l.hl7.v2.parser.fhir.HL7v23FhirStu3Parser;
 
 /*
@@ -64,7 +62,7 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 	final static Logger LOGGER = Logger.getLogger(HL7v2ReceiverFHIRApplication.class.getName());
 
 	public HL7v2ReceiverFHIRApplication() {
-		ctx = FhirContext.forDstu3();
+		ctx = FhirContext.forR4();
 	}
 
 	@Override
@@ -85,7 +83,8 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 		// Check the version = v2.5.1 or v2.3.1
 		if (theMessage.getVersion().equalsIgnoreCase("2.3") == true) {
 			LOGGER.info("Message Received with v2.3. Setting a parser for FHIR STU3");
-			setMyParser((v) new HL7v23FhirStu3Parser());
+//			setMyParser((v) new HL7v23FhirStu3Parser());
+			setMyParser((v) new HL7v23FhirR4Parser());
 		} else {
 			LOGGER.info("Message Received, but is not v2.3. Received message version is " + theMessage.getVersion());
 			return false;
@@ -123,13 +122,13 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 		// http://hl7-definition.caristix.com:9010/Default.aspx?version=HL7+v2.3&triggerEvent=ORU_R01
 		//
 		// Construct Bundle with Message type.
-		List<Bundle> bundles = getMyParser().executeParser(msg);
+		List<IBaseBundle> bundles = getMyParser().executeParser(msg);
 		if (bundles == null) {
 			return ErrorCode.INTERNAL;
 		}
 
 		try {
-			for (Bundle bundle : bundles) {
+			for (IBaseBundle bundle : bundles) {
 				String fhirJson = ctx.newJsonParser().setPrettyPrint(true).encodeResourceToString(bundle);
 				JSONObject fhirJsonObject = new JSONObject(fhirJson);
 				sendFhir(fhirJsonObject);
@@ -287,7 +286,7 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 
 		Client client = Client.create();
 		WebResource webResource = client.resource(getControllerApiUrl());
-		IParser p = FhirContext.forDstu3().newJsonParser();
+		IParser p = FhirContext.forR4().newJsonParser();
 
 		String meOffice;
 		if (getMyParser() == null || getMyParser().getReceivingFacilityName() == null) {
