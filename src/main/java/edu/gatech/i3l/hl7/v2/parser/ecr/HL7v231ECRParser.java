@@ -1,9 +1,12 @@
 package edu.gatech.i3l.hl7.v2.parser.ecr;
 
+import java.util.Date;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import ca.uhn.hl7v2.HL7Exception;
+import ca.uhn.hl7v2.model.DataTypeException;
 import ca.uhn.hl7v2.model.Varies;
 import ca.uhn.hl7v2.model.primitive.IS;
 import ca.uhn.hl7v2.model.v231.datatype.CX;
@@ -21,7 +24,6 @@ import ca.uhn.hl7v2.model.v231.datatype.XPN;
 import ca.uhn.hl7v2.model.v231.datatype.XTN;
 import ca.uhn.hl7v2.model.v231.group.ORU_R01_ORCOBRNTEOBXNTECTI;
 import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2;
-import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI;
 import ca.uhn.hl7v2.model.v231.segment.OBR;
 import ca.uhn.hl7v2.model.v231.segment.OBX;
 import ca.uhn.hl7v2.model.v231.segment.ORC;
@@ -354,9 +356,15 @@ public class HL7v231ECRParser extends BaseHL7v2ECRParser {
 		if (ok_to_put) ecr_laborder_json.put("Provider", provider_json);		
 		
 		// Observation Time
-//		String observationTime = orderRequest.getObservationDateTime().getTimeOfAnEvent().getValue();
-//		if (observationTime != null && !observationTime.isEmpty())
-//			ecr_laborder_json.put("DateTime", observationTime);
+		Date observationTime;
+		try {
+			observationTime = orderRequest.getObservationDateTime().getTimeOfAnEvent().getValueAsDate();
+			if (observationTime != null) {
+				ecr_laborder_json.put("Date", observationTime);
+			}
+		} catch (DataTypeException e) {
+			e.printStackTrace();
+		}
 		
 		// Reason for Study		
 		JSONArray reasons_json = new JSONArray();
@@ -486,7 +494,12 @@ public class HL7v231ECRParser extends BaseHL7v2ECRParser {
 		// Put date: Not required by ECR. But, putting the date anyway...
 		TS obxDate = obsResult.getDateTimeOfTheObservation();
 		if (obxDate != null) {
-			labresult_json.put("Date", obxDate.getTimeOfAnEvent().getValue());
+			try {
+				Date obxDateDate = obxDate.getTimeOfAnEvent().getValueAsDate();
+				labresult_json.put("Date", obxDateDate.toString());
+			} catch (DataTypeException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		return labresult_json;
