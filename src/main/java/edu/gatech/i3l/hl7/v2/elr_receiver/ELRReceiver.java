@@ -4,6 +4,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Properties;
 
@@ -233,6 +235,23 @@ public class ELRReceiver {
 			LOGGER.error("processException(incoming):\n" + theIncomingMessage + "\n\n");
 			LOGGER.error("processException(outgoing):\n" + theOutgoingMessage + "\n\n");
 			LOGGER.error("Exception:", theE);
+
+			if (theOutgoingMessage == null || theOutgoingMessage.isEmpty()) {
+				// String errorMessage = "ERR|||^^^^^^^^" + theE.getMessage() + "|E|||2.5.1";
+				ZonedDateTime dateTimeNow = ZonedDateTime.now();
+        		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss.SSSSZ");
+       			String dateTime = dateTimeNow.format(formatter);
+				String messageControlId = (String) theIncomingMetadata.get("/MSH-10");
+				int myMessageControlId = 100 + (int)(Math.random() * 100000);
+				String errorMessage = "MSH|^~\\&|ELR_RECEIVER|PACER-CLIENT|||" + dateTime + "||ACK^R01^ACK|" + myMessageControlId + "|P|2.5.1\r"
+					+ "MSA|AE|" + messageControlId + "\r"
+					+ "ERR|||^^^^^^^^" + theE.getMessage() + "|E";
+
+				LOGGER.info("error response: " + errorMessage.replace("\r", "\n"));
+				return errorMessage;
+			} 
+
+			LOGGER.info("error response: " + theOutgoingMessage.replace("\r", "\n"));
 			return theOutgoingMessage;
 		}
 

@@ -3,9 +3,6 @@ package edu.gatech.i3l.hl7.v2.elr_receiver;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -17,25 +14,12 @@ import org.json.JSONObject;
 // uncomment below
 //import com.fasterxml.jackson.databind.ObjectMapper;
 import com.squareup.tape2.QueueFile;
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.WebResource;
 
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.hoh.api.IAuthorizationServerCallback;
 import ca.uhn.hl7v2.model.Message;
-import ca.uhn.hl7v2.protocol.ReceivingApplication;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
 import edu.gatech.i3l.hl7.v2.parser.BaseHL7v2Parser;
-import ca.uhn.hl7v2.model.v23.group.ORU_R01_OBSERVATION;
-import ca.uhn.hl7v2.model.v23.group.ORU_R01_RESPONSE;
-import ca.uhn.hl7v2.model.v231.group.ORU_R01_ORCOBRNTEOBXNTECTI;
-import ca.uhn.hl7v2.model.v231.group.ORU_R01_PIDPD1NK1NTEPV1PV2ORCOBRNTEOBXNTECTI;
-import ca.uhn.hl7v2.model.v251.group.ORU_R01_ORDER_OBSERVATION;
-import ca.uhn.hl7v2.model.v251.group.ORU_R01_PATIENT_RESULT;
-import ca.uhn.hl7v2.protocol.ReceivingApplication;
-import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
-import ca.uhn.hl7v2.util.Terser;
 
 /*
  * HL7v2 Message Receiver Application for ELR
