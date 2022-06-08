@@ -552,8 +552,16 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 //					|| valueType.equalsIgnoreCase("TX")) {
 			int totalValues = obsResult.getObservationValueReps();
 			if (totalValues > 0) {
-				Varies obsValue = obsResult.getObservationValue(0);
-				labresult_json.put("Value", obsValue.getData());
+				String valueString = "";
+				for (int i = 0; i < totalValues; i++) {
+					Varies obsValue = obsResult.getObservationValue(i);
+					if (valueString.isBlank()) {
+						valueString = obsValue.getData().toString();
+					} else {
+						valueString += "|" + obsValue.getData().toString();
+					}
+				}
+				labresult_json.put("Value", valueString);
 				CE unitCE = obsResult.getUnits();
 				if (unitCE != null) {
 					JSONObject unit_json = new JSONObject();
