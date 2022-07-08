@@ -125,7 +125,8 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 			if (result == 0)
 				newECRs = newECRs++;
 			else {
-				return ErrorCode.PID;
+				// return ErrorCode.PID;
+				continue;
 			}
 			
 			// We should have the patient populated.
@@ -248,6 +249,10 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 				return ErrorCode.INTERNAL;
 			}
 		}		
+		
+		if (newECRs == 0) {
+			return ErrorCode.PID;
+		}
 		
 		return ErrorCode.NOERROR;
 	}

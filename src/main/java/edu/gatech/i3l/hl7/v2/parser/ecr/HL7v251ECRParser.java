@@ -2,6 +2,8 @@ package edu.gatech.i3l.hl7.v2.parser.ecr;
 
 import java.util.Date;
 
+import org.apache.log4j.Logger;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -37,6 +39,8 @@ import ca.uhn.hl7v2.model.v251.segment.PV1;
 import ca.uhn.hl7v2.model.v251.segment.STF;
 
 public class HL7v251ECRParser extends BaseHL7v2ECRParser {
+	final static Logger LOGGER = Logger.getLogger(HL7v251ECRParser.class.getName());
+
 	public HL7v251ECRParser() {
 		setMyVersion("2.5.1");
 	}
@@ -45,6 +49,10 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 		JSONObject patient_json_id = new JSONObject();
 
 		String patientID = cxObject.getIDNumber().getValue();
+		if (patientID == null || patientID.isBlank()) {
+			return null;
+		}
+
 		patient_json_id.put("value", patientID);
 
 		// Rest of Extended Composite ID are all optional. So, we get
@@ -142,20 +150,30 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 		// We store PID-3 and PID-4
 		PID pid_seg = patient.getPID();
 		JSONArray patient_json_id_list = new JSONArray();
-		patient_json.put("ID", patient_json_id_list);
 		
 		int totPID3 = pid_seg.getPid3_PatientIdentifierListReps();		
 		for (int j=0; j<totPID3; j++) {
 			CX pIdentifier = pid_seg.getPid3_PatientIdentifierList(j);
-			patient_json_id_list.put(constructPatientIDfromPID34(pIdentifier, "PATIENT_IDENTIFIER"));
+			JSONObject pIdJson = constructPatientIDfromPID34(pIdentifier, "PATIENT_IDENTIFIER");
+			if (pIdJson != null)
+				patient_json_id_list.put(pIdJson);
 		}
 
 		int totPID4 = pid_seg.getPid4_AlternatePatientIDPIDReps();
 		
 		for (int j=0; j<totPID4; j++) {
 			CX pAlternateID = pid_seg.getPid4_AlternatePatientIDPID(j);
-			patient_json_id_list.put(constructPatientIDfromPID34(pAlternateID, "ALTERNATIVE_PATIENT_ID"));
+			JSONObject pIdJson = constructPatientIDfromPID34(pAlternateID, "ALTERNATIVE_PATIENT_ID");
+			if (pIdJson != null)
+				patient_json_id_list.put(pIdJson);
 		}
+
+		if (patient_json_id_list.length() == 0) {
+			LOGGER.info("Patient ID could not be found in either pid3 or pid4");
+			return -1;
+		}
+
+		patient_json.put("ID", patient_json_id_list);
 
 		int totPatientNames = pid_seg.getPid5_PatientNameReps();
 		for (int j=0; j<totPatientNames; j++) {
@@ -177,8 +195,10 @@ public class HL7v251ECRParser extends BaseHL7v2ECRParser {
 		// We need patient id or name for rest to be useful. 
 		// If not, we move to the next patient result.
 		if (patient_json.getJSONArray("ID").length() == 0 
-				&& (patientName_given.isEmpty() && patientName_last.isEmpty()))
-			return 0;
+				&& (patientName_given.isEmpty() && patientName_last.isEmpty())) {
+			LOGGER.info("Patient names are not found in either pid5");
+			return -1;
+		}
 		
 		// Set all the collected patient information to ECR
 		JSONObject patient_name = new JSONObject();
