@@ -122,9 +122,9 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 			}
 			
 			int result = getMyParser().map_patient (patient, ecr_json);
-			if (result == 0)
-				newECRs = newECRs++;
-			else {
+			if (result == 0) {
+				newECRs++;
+			} else {
 				// return ErrorCode.PID;
 				continue;
 			}
