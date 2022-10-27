@@ -60,27 +60,27 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 		} else if (theMessage.getVersion().equalsIgnoreCase("2.3.1") == true) {
 			setMyParser((v) new HL7v231ECRParser());
 		} else {
-			LOGGER.info("Message Received, but neither v2.5.1 nor v2.3.1. Received message version is "+theMessage.getVersion());
+			LOGGER.error("Message Received, but neither v2.5.1 nor v2.3.1. Received message version is "+theMessage.getVersion());
 			return false;
 		}
 		
-		// Check the message type
-		Terser t = new Terser(theMessage);
-		try {
-			String MSH91 = t.get("/MSH-9-1");
-			String MSH92 = t.get("/MSH-9-2");
-			String MSH93 = t.get("/MSH-9-3");
+		// // Check the message type
+		// Terser t = new Terser(theMessage);
+		// try {
+		// 	String MSH91 = t.get("/MSH-9-1");
+		// 	String MSH92 = t.get("/MSH-9-2");
+		// 	String MSH93 = t.get("/MSH-9-3");
 			
-			if ((MSH91 != null && MSH91.equalsIgnoreCase("ORU") == false) 
-					|| (MSH92 != null && MSH92.equalsIgnoreCase("R01") == false)
-					|| (MSH93 != null && MSH93.equalsIgnoreCase("ORU_R01") == false)) {
-				LOGGER.info("Message with correct version received, but not ORU_R01 message type. Receved message type: "+t.get("/MSH-9-1")+" "+t.get("/MSH-9-2")+" "+t.get("/MSH-9-3"));
-				return false;
-			}
-		} catch (HL7Exception e) {
-			e.printStackTrace();
-			return false;
-		}
+		// 	if ((MSH91 != null && MSH91.equalsIgnoreCase("ORU") == false) 
+		// 			|| (MSH92 != null && MSH92.equalsIgnoreCase("R01") == false)
+		// 			|| (MSH93 != null && MSH93.equalsIgnoreCase("ORU_R01") == false)) {
+		// 		LOGGER.info("Message with correct version received, but not ORU_R01 message type. Receved message type: "+t.get("/MSH-9-1")+" "+t.get("/MSH-9-2")+" "+t.get("/MSH-9-3"));
+		// 		return false;
+		// 	}
+		// } catch (HL7Exception e) {
+		// 	e.printStackTrace();
+		// 	return false;
+		// }
 		
 		return true;
 	}

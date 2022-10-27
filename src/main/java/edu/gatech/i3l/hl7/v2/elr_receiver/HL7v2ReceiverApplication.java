@@ -19,6 +19,7 @@ import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.hoh.api.IAuthorizationServerCallback;
 import ca.uhn.hl7v2.model.Message;
 import ca.uhn.hl7v2.protocol.ReceivingApplicationException;
+import ca.uhn.hl7v2.util.Terser;
 import edu.gatech.i3l.hl7.v2.parser.BaseHL7v2Parser;
 
 /*
@@ -120,6 +121,31 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser>
 
 	public Message processMessage(Message theMessage, Map<String, Object> theMetadata)
 			throws ReceivingApplicationException, HL7Exception {
+	
+		// Check the message type
+		Terser t = new Terser(theMessage);
+		try {
+			String MSH91 = t.get("/MSH-9-1");
+			String MSH92 = t.get("/MSH-9-2");
+			String MSH93 = t.get("/MSH-9-3");
+			
+			if ((MSH91 != null && MSH91.equalsIgnoreCase("ORU") == false) 
+					|| (MSH92 != null && MSH92.equalsIgnoreCase("R01") == false)
+					|| (MSH93 != null && MSH93.equalsIgnoreCase("ORU_R01") == false)) {
+				String error_message = "Message with correct version received, but not ORU_R01 message type. Receved message type: "+t.get("/MSH-9-1")+" "+t.get("/MSH-9-2")+" "+t.get("/MSH-9-3");			
+				LOGGER.error(error_message);
+				
+				throw new ReceivingApplicationException(error_message);
+			}
+		} catch (HL7Exception e) {
+			String customHandleString = e.getMessage();
+			if (customHandleString != null && !customHandleString.isEmpty() && customHandleString.contains("^~\\&#")) {
+				LOGGER.warn("MSH-2 has extra # at the end. We will proceed. But, this needs to be fixed.");
+			} else {
+				throw e;
+			}
+		}
+			
 		LOGGER.debug("Message to be processed: \n" + theMessage.toString());
 
 		ErrorCode error = mapMyMessage(theMessage);
