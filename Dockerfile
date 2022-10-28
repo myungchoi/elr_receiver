@@ -9,7 +9,7 @@ FROM openjdk:8-alpine
 
 # Copy elr_receiver jar file to webapps.
 COPY --from=builder /usr/src/app/config.properties /usr/src/myapp/config.properties
-COPY --from=builder /usr/src/app/target/elr_receiver-0.0.4-jar-with-dependencies.jar /usr/src/myapp/elr_receiver.jar
+COPY --from=builder /usr/src/app/target/elr_receiver-0.0.5-jar-with-dependencies.jar /usr/src/myapp/elr_receiver.jar
 WORKDIR /usr/src/myapp
 CMD ["java", "-jar", "elr_receiver.jar"]
 
