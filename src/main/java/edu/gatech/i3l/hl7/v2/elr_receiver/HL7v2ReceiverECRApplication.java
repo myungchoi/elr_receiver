@@ -61,7 +61,6 @@ public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends H
 			setMyParser((v) new HL7v231ECRParser());
 		} else {
 			LOGGER.error("Message Received, but neither v2.5.1 nor v2.3.1. Received message version is "+theMessage.getVersion());
-			return false;
 		}
 		
 		// // Check the message type

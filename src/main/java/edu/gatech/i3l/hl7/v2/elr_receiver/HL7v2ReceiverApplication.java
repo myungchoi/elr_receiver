@@ -124,30 +124,31 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser>
 	
 		// Check the message type
 		Terser t = new Terser(theMessage);
-		try {
-			String MSH91 = t.get("/MSH-9-1");
-			String MSH92 = t.get("/MSH-9-2");
-			String MSH93 = t.get("/MSH-9-3");
+		// try {
+		String MSH91 = t.get("/MSH-9-1");
+		String MSH92 = t.get("/MSH-9-2");
+		String MSH93 = t.get("/MSH-9-3");
+		
+		if ((MSH91 != null && MSH91.equalsIgnoreCase("ORU") == false) 
+				|| (MSH92 != null && MSH92.equalsIgnoreCase("R01") == false)
+				|| (MSH93 != null && MSH93.equalsIgnoreCase("ORU_R01") == false)) {
+			String error_message = "Message with correct version received, but not ORU_R01 message type. Receved message type: "+t.get("/MSH-9-1")+" "+t.get("/MSH-9-2")+" "+t.get("/MSH-9-3");			
+			LOGGER.error(error_message);
 			
-			if ((MSH91 != null && MSH91.equalsIgnoreCase("ORU") == false) 
-					|| (MSH92 != null && MSH92.equalsIgnoreCase("R01") == false)
-					|| (MSH93 != null && MSH93.equalsIgnoreCase("ORU_R01") == false)) {
-				String error_message = "Message with correct version received, but not ORU_R01 message type. Receved message type: "+t.get("/MSH-9-1")+" "+t.get("/MSH-9-2")+" "+t.get("/MSH-9-3");			
-				LOGGER.error(error_message);
-				
-				throw new ReceivingApplicationException(error_message);
-			}
-		} catch (HL7Exception e) {
-			String customHandleString = e.getMessage();
-			if (customHandleString != null && !customHandleString.isEmpty() && customHandleString.contains("^~\\&#")) {
-				LOGGER.warn("MSH-2 has extra # at the end. We will proceed. But, this needs to be fixed.");
-			} else {
-				throw e;
-			}
+			throw new ReceivingApplicationException(error_message);
 		}
-			
+
 		LOGGER.debug("Message to be processed: \n" + theMessage.toString());
 
+		// } catch (HL7Exception e) {
+		// 	String customHandleString = e.getMessage();
+		// 	if (customHandleString != null && !customHandleString.isEmpty() && customHandleString.contains("^~\\&#")) {
+		// 		LOGGER.warn("MSH-2 has extra # at the end. We will proceed. But, this needs to be fixed.");
+		// 	} else {
+		// 		throw e;
+		// 	}
+		// }
+			
 		ErrorCode error = mapMyMessage(theMessage);
 		if (error != ErrorCode.NOERROR) {
 			// Create an exception.
