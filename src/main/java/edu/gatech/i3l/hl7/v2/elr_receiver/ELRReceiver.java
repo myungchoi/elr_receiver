@@ -9,7 +9,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ca.uhn.hl7v2.DefaultHapiContext;
 import ca.uhn.hl7v2.HL7Exception;
@@ -36,7 +37,7 @@ import ca.uhn.hl7v2.protocol.ReceivingApplicationExceptionHandler;
  */
 public class ELRReceiver {
 	// Logger setup
-	final static Logger LOGGER = Logger.getLogger(ELRReceiver.class.getName());
+	final static Logger LOGGER = LoggerFactory.getLogger(ELRReceiver.class.getName());
 
 	static String default_port = "8888";
 	static String default_phcr_controller_api_url = "http://localhost:8888/ECR";

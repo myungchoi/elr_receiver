@@ -3,10 +3,11 @@ package edu.gatech.i3l.hl7.v2.elr_receiver;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 
-import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
@@ -34,7 +35,7 @@ import edu.gatech.i3l.hl7.v2.parser.ecr.HL7v251ECRParser;
 
 public class HL7v2ReceiverECRApplication<v extends BaseHL7v2ECRParser> extends HL7v2ReceiverApplication<v> {
 	// Logger setup
-	final static Logger LOGGER = Logger.getLogger(HL7v2ReceiverECRApplication.class.getName());
+	final static Logger LOGGER = LoggerFactory.getLogger(HL7v2ReceiverECRApplication.class.getName());
 		
 //	public static JSONObject parseJSONFile(String filename) throws JSONException, IOException {
 //        String content = new String(Files.readAllBytes(Paths.get(filename)));

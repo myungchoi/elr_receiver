@@ -9,7 +9,6 @@ import java.util.List;
 
 import javax.ws.rs.core.MediaType;
 
-import org.apache.log4j.Logger;
 import org.hl7.fhir.dstu3.model.Bundle;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryComponent;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryResponseComponent;
@@ -24,6 +23,8 @@ import org.hl7.fhir.dstu3.model.ResourceType;
 import org.hl7.fhir.dstu3.model.StringType;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
@@ -59,7 +60,7 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 	static String tokenType = null;
 
 	// Logger setup
-	final static Logger LOGGER = Logger.getLogger(HL7v2ReceiverFHIRApplication.class.getName());
+	final static Logger LOGGER = LoggerFactory.getLogger(HL7v2ReceiverFHIRApplication.class.getName());
 
 	public HL7v2ReceiverFHIRApplication() {
 		ctx = FhirContext.forR4();
@@ -266,7 +267,7 @@ public class HL7v2ReceiverFHIRApplication<v extends BaseHL7v2FHIRParser> extends
 
 		if (response.getStatus() != 200 && response.getStatus() != 201) {
 			LOGGER.error("POSTING FHIR data to " + webResource.toString() + " failed");
-			LOGGER.error(response.getStatusInfo());
+			LOGGER.error(response.getStatusInfo().getReasonPhrase());
 		} else {
 			LOGGER.debug("FHIR Data Submitted to OpenMDI\n" + response.getEntity(String.class));
 		}

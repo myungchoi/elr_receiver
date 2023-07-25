@@ -5,7 +5,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.log4j.Logger;
 import org.hl7.fhir.dstu3.model.Bundle;
 import org.hl7.fhir.dstu3.model.CodeableConcept;
 import org.hl7.fhir.dstu3.model.Coding;
@@ -26,6 +25,8 @@ import org.hl7.fhir.dstu3.model.Reference;
 import org.hl7.fhir.dstu3.model.SimpleQuantity;
 import org.hl7.fhir.dstu3.model.StringType;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryComponent;
 
 import ca.uhn.hl7v2.HL7Exception;
@@ -58,7 +59,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 	String receivingFacilityName = null;
 
 	// Logger setup
-	final static Logger LOGGER = Logger.getLogger(HL7v23FhirStu3Parser.class.getName());
+	final static Logger LOGGER = LoggerFactory.getLogger(HL7v23FhirStu3Parser.class.getName());
 
 	private void initialize(Message msg) {
 		mapMessageHeader((ca.uhn.hl7v2.model.v23.message.ORU_R01) msg);
@@ -390,7 +391,7 @@ public class HL7v23FhirStu3Parser extends BaseHL7v2FHIRParser {
 							// Record coming over is a correction and thus replaces a final result.
 							observation.setStatus(ObservationStatus.PRELIMINARY);
 						} else {
-							LOGGER.fatal(
+							LOGGER.error(
 									"OBX received with status = " + hl7Status + ". (Table:" + obx11.getTable() + ")");
 							continue;
 						}

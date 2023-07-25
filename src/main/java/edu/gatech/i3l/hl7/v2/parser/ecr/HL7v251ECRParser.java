@@ -2,10 +2,10 @@ package edu.gatech.i3l.hl7.v2.parser.ecr;
 
 import java.util.Date;
 
-import org.apache.log4j.Logger;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ca.uhn.hl7v2.HL7Exception;
 import ca.uhn.hl7v2.model.DataTypeException;
@@ -39,7 +39,7 @@ import ca.uhn.hl7v2.model.v251.segment.PV1;
 import ca.uhn.hl7v2.model.v251.segment.STF;
 
 public class HL7v251ECRParser extends BaseHL7v2ECRParser {
-	final static Logger LOGGER = Logger.getLogger(HL7v251ECRParser.class.getName());
+	final static Logger LOGGER = LoggerFactory.getLogger(HL7v251ECRParser.class.getName());
 
 	public HL7v251ECRParser() {
 		setMyVersion("2.5.1");

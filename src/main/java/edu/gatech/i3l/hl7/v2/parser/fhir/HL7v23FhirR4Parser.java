@@ -5,7 +5,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.log4j.Logger;
 import org.hl7.fhir.instance.model.api.IBaseBundle;
 import org.hl7.fhir.r4.model.Annotation;
 import org.hl7.fhir.r4.model.Bundle;
@@ -24,6 +23,8 @@ import org.hl7.fhir.r4.model.Observation;
 import org.hl7.fhir.r4.model.Observation.ObservationReferenceRangeComponent;
 import org.hl7.fhir.r4.model.Observation.ObservationStatus;
 import org.hl7.fhir.r4.model.codesystems.ObservationCategory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Quantity;
 import org.hl7.fhir.r4.model.Reference;
@@ -59,7 +60,7 @@ public class HL7v23FhirR4Parser extends BaseHL7v2FHIRParser {
 	String receivingFacilityName = null;
 
 	// Logger setup
-	final static Logger LOGGER = Logger.getLogger(HL7v23FhirR4Parser.class.getName());
+	final static Logger LOGGER = LoggerFactory.getLogger(HL7v23FhirR4Parser.class.getName());
 
 	private void initialize(Message msg) {
 		mapMessageHeader((ca.uhn.hl7v2.model.v23.message.ORU_R01) msg);
@@ -393,7 +394,7 @@ public class HL7v23FhirR4Parser extends BaseHL7v2FHIRParser {
 							// Record coming over is a correction and thus replaces a final result.
 							observation.setStatus(ObservationStatus.PRELIMINARY);
 						} else {
-							LOGGER.fatal(
+							LOGGER.error(
 									"OBX received with status = " + hl7Status + ". (Table:" + obx11.getTable() + ")");
 							continue;
 						}

@@ -7,9 +7,10 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // uncomment below
 //import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +45,7 @@ public abstract class HL7v2ReceiverApplication<v extends BaseHL7v2Parser>
 	private String indexServiceApiUrl;
 
 	// Logger setup
-	final static Logger LOGGER = Logger.getLogger(HL7v2ReceiverApplication.class.getName());
+	final static Logger LOGGER = LoggerFactory.getLogger(HL7v2ReceiverApplication.class.getName());
 
 	// Error Status
 	static int PID_ERROR = -1;
